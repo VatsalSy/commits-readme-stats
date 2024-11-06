@@ -1,6 +1,6 @@
-name: 'Profile Readme Development Stats'
+name: 'GitHub Commit Statistics'
 author: Vatsal Sanjay
-description: 'Are you an early 🐤 or a night 🦉? When are you most productive during the day? Let''s check out in your readme!'
+description: 'When are you most productive during the week? Let''s check out in your readme!'
 
 inputs:
   GH_TOKEN:
@@ -11,7 +11,7 @@ inputs:
   SECTION_NAME:
     description: 'Name used in readme to scope the updated section'
     required: false
-    default: "waka"
+    default: "github-stats"
 
   SHOW_COMMIT:
     required: false

@@ -4,6 +4,7 @@ GitPython~=3.1
 
 # Request making and response parsing modules:
 httpx~=0.23
+humanize~=4.9.0
 
 # Codestyle checking modules:
 flake8~=6.0

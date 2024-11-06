@@ -11,7 +11,7 @@ class EnvironmentManager:
 
     GH_TOKEN = environ["INPUT_GH_TOKEN"]
 
-    SECTION_NAME = getenv("INPUT_SECTION_NAME", "waka")
+    SECTION_NAME = getenv("INPUT_SECTION_NAME", "github-stats")
     PULL_BRANCH_NAME = getenv("INPUT_PULL_BRANCH_NAME", "")
     PUSH_BRANCH_NAME = getenv("INPUT_PUSH_BRANCH_NAME", "")
 
@@ -26,3 +26,4 @@ class EnvironmentManager:
 
     LOCALE = getenv("INPUT_LOCALE", "en")
     DEBUG_LOGGING = getenv("INPUT_DEBUG_LOGGING", "0").lower() in _TRUTHY
+    DEBUG_RUN = getenv("DEBUG_RUN", "False").lower() in _TRUTHY

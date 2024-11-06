@@ -1,17 +1,26 @@
 """
-Readme Development Metrics With waka time progress
+GitHub Commit Statistics Generator
 """
 from asyncio import run
 from datetime import datetime
-from typing import Dict
 
-from manager_download import init_download_manager, DownloadManager as DM
-from manager_environment import EnvironmentManager as EM
-from manager_github import init_github_manager, GitHubManager as GHM
-from manager_file import init_localization_manager, FileManager as FM
-from manager_debug import init_debug_manager, DebugManager as DBM
-from yearly_commit_calculator import calculate_commit_data
-from graphics_list_formatter import make_commit_day_time_list
+from .manager_download import init_download_manager, DownloadManager as DM
+from .manager_environment import EnvironmentManager as EM
+from .manager_github import init_github_manager, GitHubManager as GHM
+from .manager_file import init_localization_manager, FileManager as FM
+from .manager_debug import init_debug_manager, DebugManager as DBM
+from .yearly_commit_calculator import calculate_commit_data
+from .graphics_list_formatter import make_commit_day_time_list
+
+
+async def collect_user_repositories():
+    """
+    Collects all repositories user has access to.
+    """
+    DBM.i("Collecting user repositories...")
+    repositories = await DM.get_remote_graphql("user_repository_list", username=GHM.USER.login)
+    DBM.g("User repositories collected!")
+    return repositories
 
 
 async def get_stats() -> str:
