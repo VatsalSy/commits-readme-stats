@@ -4,8 +4,8 @@ from datetime import datetime
 
 from pytz import timezone, utc
 
-from manager_environment import EnvironmentManager as EM
-from manager_file import FileManager as FM
+from .manager_file import FileManager as FM
+from .manager_environment import EnvironmentManager as EM
 
 
 DAY_TIME_EMOJI = ["🌞", "🌆", "🌃", "🌙"]  # Emojis, representing different times of day.

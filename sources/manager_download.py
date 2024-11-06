@@ -7,8 +7,8 @@ from typing import Awaitable, Dict, Callable, Optional, List, Tuple
 from httpx import AsyncClient
 from yaml import safe_load
 
-from manager_environment import EnvironmentManager as EM
-from manager_debug import DebugManager as DBM
+from .manager_environment import EnvironmentManager as EM
+from .manager_debug import DebugManager as DBM
 
 GITHUB_API_QUERIES = {
     # Query to collect info about all user repositories, including: is it a fork, name and owner login.

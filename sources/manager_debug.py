@@ -5,14 +5,12 @@ from typing import Dict
 
 from humanize import precisedelta
 
-from manager_environment import EnvironmentManager as EM
+from .manager_environment import EnvironmentManager as EM
 
 
 def init_debug_manager():
     """
-    Initialize download manager:
-    - Setup headers for GitHub GraphQL requests.
-    - Launch static queries in background.
+    Initialize debug manager with appropriate logging level.
     """
     DebugManager.create_logger("DEBUG" if EM.DEBUG_LOGGING else "ERROR")
 
@@ -62,4 +60,4 @@ class DebugManager:
     @staticmethod
     def p(message: str, **kwargs):
         message = DebugManager._process_template(message, kwargs)
-        DebugManager._logger.error(message)
+        DebugManager._logger.error(f"{DebugManager._COLOR_RED}{message}{DebugManager._COLOR_RESET}")

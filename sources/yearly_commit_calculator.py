@@ -4,11 +4,11 @@ from re import search
 from datetime import datetime
 from typing import Dict, Tuple
 
-from manager_download import DownloadManager as DM
-from manager_environment import EnvironmentManager as EM
-from manager_github import GitHubManager as GHM
-from manager_file import FileManager as FM
-from manager_debug import DebugManager as DBM
+from .manager_download import DownloadManager as DM
+from .manager_environment import EnvironmentManager as EM
+from .manager_github import GitHubManager as GHM
+from .manager_file import FileManager as FM
+from .manager_debug import DebugManager as DBM
 
 
 async def calculate_commit_data(repositories: Dict) -> Tuple[Dict, Dict]:

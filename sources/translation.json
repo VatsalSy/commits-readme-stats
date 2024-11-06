@@ -1,0 +1,19 @@
+{
+    "en": {
+        "I am Most Productive on": "I am Most Productive on %s",
+        "Monday": "Monday",
+        "Tuesday": "Tuesday",
+        "Wednesday": "Wednesday",
+        "Thursday": "Thursday",
+        "Friday": "Friday",
+        "Saturday": "Saturday",
+        "Sunday": "Sunday",
+        "No Activity Tracked This Week": "No Activity Tracked This Week",
+        "This Week I Spend My Time On": "This Week I Spend My Time On",
+        "Timezone": "Timezone",
+        "Languages": "Languages",
+        "Editors": "Editors",
+        "Projects": "Projects",
+        "operating system": "Operating System"
+    }
+}
