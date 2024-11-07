@@ -84,7 +84,9 @@ async def update_data_with_commit_stats(repo_details: Dict, yearly_data: Dict, d
         # Extract branch names from the response structure
         branches = [branch["name"] for branch in branches_data["repository"]["refs"]["nodes"]]
         
-        commit_count = 0  # Add counter for commits
+        # Track unique commit IDs
+        unique_commits = set()
+        
         for branch_name in branches:
             try:
                 commits = await DM.get_remote_graphql(
@@ -98,11 +100,13 @@ async def update_data_with_commit_stats(repo_details: Dict, yearly_data: Dict, d
                 user_commits = [
                     commit for commit in commits["repository"]["ref"]["target"]["history"]["nodes"]
                     if commit["author"]["user"] and commit["author"]["user"]["login"] == target_username
+                    and commit["oid"] not in unique_commits  # Only process new commits
                 ]
                 
-                commit_count += len(user_commits)  # Count commits for this branch
-                
+                # Add commit IDs to the set
                 for commit in user_commits:
+                    unique_commits.add(commit["oid"])
+                    
                     date = search(r"\d+-\d+-\d+", commit["committedDate"]).group()
                     curr_year = datetime.fromisoformat(date).year
                     quarter = (datetime.fromisoformat(date).month - 1) // 3 + 1
@@ -126,8 +130,8 @@ async def update_data_with_commit_stats(repo_details: Dict, yearly_data: Dict, d
             except Exception as e:
                 DBM.w(f"\t\tError processing branch {branch_name}: {str(e)}")
         
-        # Print repository info with commit count
-        DBM.i(f"\t\t{repo_details['owner']['login']}/{repo_details['name']}: {commit_count} commits")
+        # Print repository info with unique commit count
+        DBM.i(f"\t\t{repo_details['owner']['login']}/{repo_details['name']}: {len(unique_commits)} commits")
                 
     except Exception as e:
         DBM.w(f"\t\tError processing repository {repo_details['name']}: {str(e)}")
