@@ -1,3 +1,4 @@
+import os
 from os.path import join, isfile, dirname, exists
 from pickle import load as load_pickle, dump as dump_pickle
 from json import load as load_json
@@ -54,9 +55,26 @@ class FileManager:
         :param content: File content (utf-8 string).
         :param append: True for appending to file, false for rewriting.
         :param assets: True for saving to 'assets' directory, false otherwise.
+        :raises ValueError: If path traversal is detected
         """
-        name = join(FileManager.ASSETS_DIR, name) if assets else name
-        with open(name, "a" if append else "w", encoding="utf-8") as file:
+        # Sanitize filename to prevent path traversal
+        safe_name = os.path.basename(name)
+        
+        if assets:
+            # Ensure assets directory exists
+            if not os.path.exists(FileManager.ASSETS_DIR):
+                os.makedirs(FileManager.ASSETS_DIR)
+            safe_path = os.path.abspath(os.path.join(FileManager.ASSETS_DIR, safe_name))
+            # Verify the path is within assets directory
+            if not safe_path.startswith(os.path.abspath(FileManager.ASSETS_DIR)):
+                raise ValueError("Invalid file path - attempted directory traversal")
+        else:
+            safe_path = os.path.abspath(safe_name)
+            # Verify path is in current directory
+            if not safe_path.startswith(os.path.abspath(os.curdir)):
+                raise ValueError("Invalid file path - attempted directory traversal")
+
+        with open(safe_path, "a" if append else "w", encoding="utf-8") as file:
             file.write(content)
 
     @staticmethod
