@@ -4,20 +4,20 @@ GitPython==3.1.43
 
 # Request making and response parsing modules:
 httpx==0.27.2
-humanize==4.9.0
+humanize==4.11.0
 
 # Environment variables
 python-dotenv==1.0.1
 
 # Time zone handling
-pytz==2024.1
+pytz==2024.2
 
 # Codestyle checking modules:
 flake8==7.1.1
-black==24.3.0
+black==24.10.0
 
 # Add encryption support
 cryptography==43.0.3
 
 # Development tools
-pre-commit==3.6.0
+pre-commit==4.0.1
