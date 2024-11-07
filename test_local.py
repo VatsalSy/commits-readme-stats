@@ -39,7 +39,7 @@ async def run_local():
     init_debug_manager()
     init_github_manager()
     
-    github_username = "VatsalSy"  # Change this to test different users
+    github_username = "AnjaliML"  # Change this to test different users
     print(f"\nGenerating stats for user: {github_username}")
     
     # Validate if user exists before proceeding

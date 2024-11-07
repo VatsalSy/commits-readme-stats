@@ -36,20 +36,6 @@
     <a href="https://github.com/vatsalsy/cust-waka-readme-stats/issues">Request Feature</a>
   </p>
 
-## Prep Work
-
-1. You need to update the markdown file(.md) with 2 comments. You can refer [here](#update-your-readme) for updating it.
-2. You'll need a WakaTime API Key. You can get that from your WakaTime Account Settings
-    - You can refer [here](#new-to-wakatime), if you're new to WakaTime
-3. You'll need a GitHub API Token with `repo` and `user` scope from [here](https://github.com/settings/tokens) if you're running the action to get commit metrics
-   > enabling the `repo` scope seems **DANGEROUS**<br/>
-   > but this GitHub Action only accesses your commit timestamp and lines of code added or deleted in repository you contributed.
-   - You can use [this](#profile-repository) example to work it out
-4. You need to save the WakaTime API Key and the GitHub API Token in the repository secrets. You can find that in the Settings of your repository. Be sure to save those as the following.
-    - WakaTime API Key as `WAKATIME_API_KEY=<your wakatime API Key>`
-    - GitHub Personal Access Token as `GH_TOKEN=<your github access token>`
-5. You can enable and disable feature flags based on requirements.
-
 
 This Action will run everyday at 00.00 IST
 
@@ -190,7 +176,7 @@ XML                      8 mins              ░░░░░░░░░░░�
 
 ```text
 💻 Operating Systems:
-Windows                  8 hrs 46 mins       █████████████████████████   100.0%
+Windows                  8 hrs 46 mins       ██████████████████████���██   100.0%
 ```
 
 `SHOW_PROJECTS` flag can be set to `False` to hide the Projects worked on
@@ -286,3 +272,21 @@ However, if you are using this project and happy with it or just want to encoura
 ## Acknowledgments
 
 This project is a fork of [anmol098/waka-readme-stats](https://github.com/anmol098/waka-readme-stats). Many thanks to Anmol and all the contributors of the original project for creating this awesome GitHub Action.
+
+## Local Setup
+
+1. Clone the repository
+2. Create a `.env` file with your GitHub token:
+   ```
+   INPUT_GH_TOKEN=your_github_personal_access_token
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Run locally:
+   ```bash
+   python test_local.py
+   ```
+
+You can modify the username in `test_local.py` to analyze different GitHub users.

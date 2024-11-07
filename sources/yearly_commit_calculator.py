@@ -1,8 +1,9 @@
 from asyncio import sleep
 from json import dumps
 from re import search
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Tuple, List
+import os
 
 from .manager_download import DownloadManager as DM
 from .manager_environment import EnvironmentManager as EM
@@ -24,14 +25,28 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     
     # Create cache filename with username
     cache_filename = f"commits_data_{target_username}.pick"
+    cache_path = os.path.join("assets", cache_filename)
     
-    # Try to load cached data for this specific username
-    cached_data = FM.cache_binary(cache_filename, assets=True)
-    if cached_data is not None:
-        DBM.i("Commit data restored from cache!")
-        return cached_data[0], cached_data[1]
+    # Check if cache exists and is recent (less than 4 hours old)
+    use_cache = False
+    if os.path.exists(cache_path):
+        file_modified_time = datetime.fromtimestamp(os.path.getmtime(cache_path))
+        time_difference = datetime.now() - file_modified_time
+        use_cache = time_difference < timedelta(hours=4)
+        
+        if use_cache:
+            DBM.i(f"Using cached data from {file_modified_time}")
+        else:
+            DBM.i(f"Cache exists but is too old ({time_difference.total_seconds()/3600:.1f} hours)")
     
-    DBM.i("No cached commit data found for this user, recalculating...")
+    # Try to load cached data if it's recent enough
+    if use_cache:
+        cached_data = FM.cache_binary(cache_filename, assets=True)
+        if cached_data is not None:
+            DBM.i("Commit data restored from cache!")
+            return cached_data[0], cached_data[1]
+    
+    DBM.i("Fetching fresh commit data...")
     yearly_data = dict()
     date_data = dict()
     
@@ -44,7 +59,7 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     
     # Cache the data for this specific username
     FM.cache_binary(cache_filename, [yearly_data, date_data], assets=True)
-    DBM.i("Commit data saved to cache!")
+    DBM.i("New commit data saved to cache!")
     
     return yearly_data, date_data
 
