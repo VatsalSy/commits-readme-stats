@@ -3,10 +3,23 @@
 > A streamlined fork of [anmol098/waka-readme-stats](https://github.com/anmol098/waka-readme-stats) focused on commit analytics.
 
 <p align="center">
-   <img src="https://img.shields.io/badge/language-python-blue?style"/>
-   <img src="https://img.shields.io/github/license/VatsalSy/cust-waka-readme-stats"/>
-   <img src="https://img.shields.io/static/v1?label=%F0%9F%8C%9F&message=If%20Useful&style=style=flat&color=BC4E99" alt="Star Badge"/>
+   <a href="https://www.python.org/">
+      <img src="https://img.shields.io/badge/language-python-blue?style" alt="Python Badge"/>
+   </a>
+   <a href="https://github.com/VatsalSy/commits-readme-stats/blob/main/LICENSE">
+      <img src="https://img.shields.io/github/license/VatsalSy/commits-readme-stats" alt="License Badge"/>
+   </a>
+   <a href="https://github.com/VatsalSy/commits-readme-stats/stargazers">
+      <img src="https://img.shields.io/github/stars/VatsalSy/commits-readme-stats" alt="Stars Badge"/>
+   </a>
+   <a href="https://github.com/VatsalSy/commits-readme-stats/network/members">
+      <img src="https://img.shields.io/github/forks/VatsalSy/commits-readme-stats" alt="Forks Badge"/>
+   </a>
+   <a href="https://github.com/VatsalSy/commits-readme-stats">
+      <img src="https://img.shields.io/static/v1?label=%F0%9F%8C%9F&message=If%20Useful&style=style=flat&color=BC4E99" alt="Star Badge"/>
+   </a>
 </p>
+
 
 <p align="center">
    Are you an early 🐤 or a night 🦉?
