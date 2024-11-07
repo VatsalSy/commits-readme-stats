@@ -57,7 +57,7 @@ class FileManager:
         :param assets: True for saving to 'assets' directory, false otherwise.
         :raises ValueError: If path traversal is detected
         """
-        # Sanitize filename to prevent path traversal
+        # Get safe filename
         safe_name = os.path.basename(name)
         
         if assets:
