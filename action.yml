@@ -18,27 +18,48 @@ inputs:
     description: 'Custom commit message'
     required: false
     default: 'docs(stats): update github stats'
+  COMMIT_BY_ME:
+    description: 'Whether commits should be authored by the token owner'
+    required: false
+    default: 'false'
+  COMMIT_USERNAME:
+    description: 'Username for commit author'
+    required: false
+    default: 'github-actions[bot]'
+  COMMIT_EMAIL:
+    description: 'Email for commit author'
+    required: false
+    default: '41898282+github-actions[bot]@users.noreply.github.com'
 
 runs:
   using: 'composite'
   steps:
+    - name: Configure Git
+      shell: bash
+      run: |
+        git config --global user.name "${{ inputs.COMMIT_USERNAME }}"
+        git config --global user.email "${{ inputs.COMMIT_EMAIL }}"
+        
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
         
     - name: Install dependencies
-      run: pip install -r requirements.txt
       shell: bash
-      
-    - name: Generate Stats
-      run: python github_stats.py ${{ github.repository_owner }}
+      working-directory: ${{ github.action_path }}
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run stats update
       shell: bash
       env:
         INPUT_GH_TOKEN: ${{ inputs.GH_TOKEN }}
         INPUT_SHOW_COMMIT: ${{ inputs.SHOW_COMMIT }}
         INPUT_SHOW_DAYS_OF_WEEK: ${{ inputs.SHOW_DAYS_OF_WEEK }}
         INPUT_COMMIT_MESSAGE: ${{ inputs.COMMIT_MESSAGE }}
-        INPUT_COMMIT_BY_ME: 'true'
-        INPUT_COMMIT_USERNAME: ${{ github.repository_owner }}
-        INPUT_COMMIT_EMAIL: ${{ github.repository_owner }}@users.noreply.github.com 
+        INPUT_COMMIT_BY_ME: ${{ inputs.COMMIT_BY_ME }}
+        INPUT_COMMIT_USERNAME: ${{ inputs.COMMIT_USERNAME }}
+        INPUT_COMMIT_EMAIL: ${{ inputs.COMMIT_EMAIL }}
+      run: python -m sources.main
