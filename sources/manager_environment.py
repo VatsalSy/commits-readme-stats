@@ -27,3 +27,7 @@ class EnvironmentManager:
     LOCALE = getenv("INPUT_LOCALE", "en")
     DEBUG_LOGGING = getenv("INPUT_DEBUG_LOGGING", "0").lower() in _TRUTHY
     DEBUG_RUN = getenv("DEBUG_RUN", "False").lower() in _TRUTHY
+
+    SYMBOL_VERSION = getenv("INPUT_SYMBOL_VERSION", "1")  # Default to version 1
+
+    IGNORED_REPOS = [r.strip() for r in getenv("INPUT_IGNORED_REPOS", "").split(",") if r.strip()]

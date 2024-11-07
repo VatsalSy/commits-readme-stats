@@ -20,7 +20,7 @@ def init_github_manager():
     Current user, user readme repo and readme file are downloaded.
     """
     GitHubManager.prepare_github_env()
-    DBM.i(f"Current user: {GitHubManager.USER.login}.")
+    DBM.i(f"Authenticated as: {GitHubManager.USER.login}")
 
 
 class GitHubManager:
@@ -185,3 +185,16 @@ class GitHubManager:
         FM.write_file(environ["GITHUB_OUTPUT"], f"README_CONTENT<<{eol}\n{prefix}\n\n{stats}\n{eol}\n", append=True)
 
         DBM.g("Action output set!")
+
+    @staticmethod
+    async def user_exists(username: str) -> bool:
+        """Check if a GitHub user exists."""
+        try:
+            github = Github(EM.GH_TOKEN)
+            user = github.get_user(username)
+            # Try to access a property to verify the user exists
+            _ = user.login
+            return True
+        except Exception as e:
+            DBM.i(f"Error checking user existence: {str(e)}")
+            return False

@@ -1,7 +1,8 @@
-from os.path import join, isfile, dirname
+from os.path import join, isfile, dirname, exists
 from pickle import load as load_pickle, dump as dump_pickle
 from json import load as load_json
 from typing import Dict, Optional, Any
+from os import makedirs
 
 from .manager_environment import EnvironmentManager as EM
 
@@ -59,25 +60,25 @@ class FileManager:
             file.write(content)
 
     @staticmethod
-    def cache_binary(name: str, content: Optional[Any] = None, assets: bool = False) -> Optional[Any]:
+    def cache_binary(name: str, content: Any = None, assets: bool = False) -> Optional[Any]:
         """
-        Save binary output file if provided or read if content is None.
-
-        :param name: File name.
-        :param content: File content (utf-8 string) or None.
-        :param assets: True for saving to 'assets' directory, false otherwise.
-        :returns: File cache contents if content is None, None otherwise.
+        Cache binary data to file.
+        If content is None, loads and returns data from file.
+        Otherwise saves content to file.
         """
-        name = join(FileManager.ASSETS_DIR, name) if assets else name
-        if content is None and not isfile(name):
-            return None
+        if assets:
+            # Create assets directory if it doesn't exist
+            assets_dir = "assets"
+            if not exists(assets_dir):
+                makedirs(assets_dir)
+            name = join(assets_dir, name)
 
-        with open(name, "rb" if content is None else "wb") as file:
-            if content is None:
-                try:
-                    return load_pickle(file)
-                except Exception:
-                    return None
-            else:
-                dump_pickle(content, file)
+        if content is None:
+            if not isfile(name):
                 return None
+            with open(name, "rb") as file:
+                return load_pickle(file)
+        else:
+            with open(name, "wb") as file:
+                dump_pickle(content, file)
+            return None
