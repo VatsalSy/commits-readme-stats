@@ -10,7 +10,7 @@ humanize==4.11.0
 python-dotenv==1.0.1
 
 # Time zone handling
-pytz==2024.1
+pytz==2024.2
 
 # Codestyle checking modules:
 flake8==6.0.0
