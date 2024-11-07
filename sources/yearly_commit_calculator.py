@@ -21,27 +21,31 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     :returns: Commit quarter yearly data dictionary.
     """
     DBM.i("Calculating commit data...")
-    if EM.DEBUG_RUN:
-        content = FM.cache_binary("commits_data.pick", assets=True)
-        if content is not None:
-            DBM.g("Commit data restored from cache!")
-            return tuple(content)
-        else:
-            DBM.w("No cached commit data found, recalculating...")
-
+    
+    # Create cache filename with username
+    cache_filename = f"commits_data_{target_username}.pick"
+    
+    # Try to load cached data for this specific username
+    cached_data = FM.cache_binary(cache_filename, assets=True)
+    if cached_data is not None:
+        DBM.i("Commit data restored from cache!")
+        return cached_data[0], cached_data[1]
+    
+    DBM.i("No cached commit data found for this user, recalculating...")
     yearly_data = dict()
     date_data = dict()
-    for ind, repo in enumerate(repositories):
-        if repo["name"] not in EM.IGNORED_REPOS:
-            repo_name = "[private]" if repo["isPrivate"] else f"{repo['owner']['login']}/{repo['name']}"
-            DBM.i(f"\t{ind + 1}/{len(repositories)} Retrieving repo: {repo_name}")
-            await update_data_with_commit_stats(repo, yearly_data, date_data, target_username)
-    DBM.g("Commit data calculated!")
-
-    if EM.DEBUG_RUN:
-        FM.cache_binary("commits_data.pick", [yearly_data, date_data], assets=True)
-        FM.write_file("commits_data.json", dumps([yearly_data, date_data]), assets=True)
-        DBM.g("Commit data saved to cache!")
+    
+    # Process repositories one by one
+    for i, repo in enumerate(repositories, 1):
+        DBM.i(f"\t{i}/{len(repositories)} Retrieving repo: {repo['owner']['login']}/{repo['name']}")
+        await update_data_with_commit_stats(repo, yearly_data, date_data, target_username)
+    
+    DBM.i("Commit data calculated!")
+    
+    # Cache the data for this specific username
+    FM.cache_binary(cache_filename, [yearly_data, date_data], assets=True)
+    DBM.i("Commit data saved to cache!")
+    
     return yearly_data, date_data
 
 
