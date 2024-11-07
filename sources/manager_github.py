@@ -52,15 +52,19 @@ class GitHubManager:
             rmtree(clone_path, ignore_errors=True)
 
             GitHubManager._REMOTE_NAME = f"{GitHubManager.USER.login}/{GitHubManager.USER.login}"
-            masked_url = TokenManager.mask_token(
-                f"https://{EM.GH_TOKEN}@github.com/{GitHubManager._REMOTE_NAME}.git"
-            )
-            DBM.i(f"Cloning from: {masked_url}")
+            repo_url = f"https://github.com/{GitHubManager._REMOTE_NAME}.git"
             
-            GitHubManager._REPO_PATH = f"https://{EM.GH_TOKEN}@github.com/{GitHubManager._REMOTE_NAME}.git"
-
+            # Use secure credential helper instead of token in URL
+            credentials = TokenManager.get_credentials_helper()
+            DBM.i(f"Cloning from: {repo_url}")
+            
+            # Clone using credential helper environment
             GitHubManager.REMOTE = github.get_repo(GitHubManager._REMOTE_NAME)
-            GitHubManager.REPO = Repo.clone_from(GitHubManager._REPO_PATH, to_path=clone_path)
+            GitHubManager.REPO = Repo.clone_from(
+                repo_url, 
+                to_path=clone_path,
+                env=credentials
+            )
             
             DBM.g("Repository cloned successfully")
             

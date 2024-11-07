@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, Dict
 
 class TokenManager:
     """Secure token management class"""
@@ -68,3 +68,13 @@ class TokenManager:
             visible_chars = 4 if len(token) > 4 else 0
             return text.replace(token, f"{token[:visible_chars]}{'*' * (len(token) - visible_chars)}")
         return text
+    
+    @classmethod
+    def get_credentials_helper(cls) -> Dict[str, str]:
+        """Get Git credentials helper configuration"""
+        token = cls.get_token()
+        return {
+            'GIT_ASKPASS': 'echo',
+            'GIT_USERNAME': 'oauth2',
+            'GIT_PASSWORD': token
+        }
