@@ -1,0 +1,33 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Run weekly
+  push:
+    paths:
+      - 'requirements.txt'
+  pull_request:
+    paths:
+      - 'requirements.txt'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          
+      - name: Install safety
+        run: pip install safety
+        
+      - name: Run safety check
+        run: safety check -r requirements.txt
+
+      - name: Run pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
