@@ -1,5 +1,5 @@
 from asyncio import Task
-from hashlib import md5
+from hashlib import sha256
 from json import dumps
 from string import Template
 from typing import Dict, List
@@ -142,7 +142,7 @@ class DownloadManager:
             kwargs[var] = ''.join(char for char in value if ord(char) >= 32)
                 
         # Generate cache key
-        key = f"{query}_{md5(dumps(kwargs, sort_keys=True).encode('utf-8')).digest()}"
+        key = f"{query}_{sha256(dumps(kwargs, sort_keys=True).encode('utf-8')).hexdigest()}"
         
         if key not in DownloadManager._REMOTE_RESOURCES_CACHE:
             res = await DownloadManager._fetch_graphql_query(query, kwargs)

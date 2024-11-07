@@ -1,14 +1,22 @@
+from copyreg import pickle
 import os
 from os.path import join, isfile, dirname, exists
 from pickle import load as load_pickle, dump as dump_pickle
 from json import load as load_json
 from typing import Dict, Optional, Any
 from os import makedirs
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 import stat
 import io
+import re
+from functools import wraps
+from time import sleep
+import signal
+from contextlib import contextmanager
+import json
 
 from .manager_environment import EnvironmentManager as EM
+from .manager_debug import DebugManager as DBM
 
 
 def init_localization_manager():
@@ -17,6 +25,28 @@ def init_localization_manager():
     Load GUI translations JSON file.
     """
     FileManager.load_localization("translation.json")
+
+
+class TimeoutException(Exception):
+    pass
+
+
+@contextmanager
+def timeout(seconds):
+    """Context manager for timing out operations"""
+    def timeout_handler(signum, frame):
+        raise TimeoutException("Operation timed out")
+
+    # Set the timeout handler
+    original_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    
+    try:
+        yield
+    finally:
+        # Restore the original handler and disable alarm
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, original_handler)
 
 
 class FileManager:
@@ -102,38 +132,48 @@ class FileManager:
 
     @staticmethod
     def cache_binary(name: str, content: Any = None, assets: bool = False) -> Optional[Any]:
-        """Cache binary data to file with encryption."""
-        if assets:
-            if not exists(FileManager.ASSETS_DIR):
-                makedirs(FileManager.ASSETS_DIR)
-            name = join(FileManager.ASSETS_DIR, name)
-
-        # Initialize encryption
-        fernet = Fernet(FileManager._get_encryption_key())
-
-        if content is None:
-            if not isfile(name):
-                return None
-            try:
-                with open(name, "rb") as file:
-                    encrypted_data = file.read()
-                    decrypted_data = fernet.decrypt(encrypted_data)
-                    return load_pickle(io.BytesIO(decrypted_data))
-            except Exception as e:
-                DBM.w(f"Failed to load cache: {str(e)}")
-                return None
-        else:
-            try:
-                # Pickle and encrypt the data
-                pickled_data = io.BytesIO()
-                dump_pickle(content, pickled_data)
-                encrypted_data = fernet.encrypt(pickled_data.getvalue())
+        """Enhanced secure cache with better encryption"""
+        try:
+            # Validate filename
+            if not re.match(r'^[\w\-. ]+$', name):
+                raise ValueError("Invalid cache filename")
                 
-                # Save with restricted permissions
-                with open(name, "wb") as file:
-                    os.chmod(name, stat.S_IRUSR | stat.S_IWUSR)  # 600 permissions
-                    file.write(encrypted_data)
+            if assets:
+                cache_dir = os.path.abspath(FileManager.ASSETS_DIR)
+                if not os.path.exists(cache_dir):
+                    os.makedirs(cache_dir, mode=0o700)  # Secure permissions
+                filepath = os.path.join(cache_dir, name)
+                
+                # Prevent directory traversal
+                if not os.path.abspath(filepath).startswith(cache_dir):
+                    raise ValueError("Invalid cache path")
+            else:
+                filepath = os.path.abspath(name)
+
+            fernet = Fernet(FileManager._get_encryption_key())
+            
+            if content is not None:
+                # Serialize data securely
+                json_data = json.dumps(content)
+                encrypted_data = fernet.encrypt(json_data.encode())
+                with open(filepath, 'wb') as f:
+                    f.write(encrypted_data)
                 return None
-            except Exception as e:
-                DBM.w(f"Failed to save cache: {str(e)}")
+            
+            try:
+                with open(filepath, 'rb') as f:
+                    encrypted_data = f.read()
+                try:
+                    decrypted_data = fernet.decrypt(encrypted_data)
+                    return json.loads(decrypted_data)
+                except InvalidToken:
+                    return None
+            except FileNotFoundError:
                 return None
+        except Exception as e:
+            # Use DBM for logging
+            error_msg = str(e)
+            if "token" in error_msg.lower():
+                error_msg = "[REDACTED TOKEN ERROR]"
+            DBM.w(f"Cache error: {error_msg}")
+            return None

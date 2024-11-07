@@ -5,9 +5,11 @@ on:
     - cron: '0 0 * * 0'  # Run weekly
   push:
     paths:
+      - '**.py'
       - 'requirements.txt'
   pull_request:
     paths:
+      - '**.py'
       - 'requirements.txt'
 
 jobs:
@@ -21,13 +23,15 @@ jobs:
         with:
           python-version: '3.x'
           
-      - name: Install safety
-        run: pip install safety
-        
+      - name: Install dependencies
+        run: |
+          pip install bandit safety pip-audit
+          
       - name: Run safety check
         run: safety check -r requirements.txt
+        
+      - name: Run bandit
+        run: bandit -r . -ll -ii -x ./tests,./venv
 
       - name: Run pip-audit
-        run: |
-          pip install pip-audit
-          pip-audit -r requirements.txt
+        run: pip-audit -r requirements.txt

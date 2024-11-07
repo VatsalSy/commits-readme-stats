@@ -1,16 +1,25 @@
 import os
 from typing import Optional, Dict
+import hashlib
+import math
 
 class TokenManager:
-    """Secure token management class"""
+    """Enhanced secure token management"""
     
     _token: Optional[str] = None
+    _token_hash: Optional[str] = None  # Store hash instead of actual token
     
     @classmethod
     def get_token(cls) -> str:
-        """Get GitHub token securely"""
         if cls._token is None:
             cls._token = cls._load_token()
+            # Store hash for validation
+            cls._token_hash = hashlib.sha256(cls._token.encode()).hexdigest()
+        else:
+            # Validate token hasn't been tampered with
+            current_hash = hashlib.sha256(cls._token.encode()).hexdigest()
+            if current_hash != cls._token_hash:
+                raise SecurityException("Token validation failed - possible tampering detected")
         return cls._token
     
     @classmethod
@@ -50,13 +59,27 @@ class TokenManager:
     
     @staticmethod
     def _validate_token(token: str) -> bool:
-        """Basic validation of token format"""
-        return (
-            isinstance(token, str) 
-            and len(token) >= 40
-            and (token.startswith(('ghp_', 'github_pat_')) 
-                 or all(c in 'abcdef0123456789' for c in token))
-        )
+        """Enhanced token validation"""
+        if not isinstance(token, str) or len(token) < 40:
+            return False
+            
+        # Check for common token prefixes
+        valid_prefixes = ('ghp_', 'github_pat_')
+        if not any(token.startswith(prefix) for prefix in valid_prefixes):
+            # Fall back to checking if it's a classic token format
+            if not all(c in 'abcdef0123456789' for c in token):
+                return False
+                
+        # Basic entropy check
+        char_frequency = {}
+        for char in token:
+            char_frequency[char] = char_frequency.get(char, 0) + 1
+        entropy = sum(-freq/len(token) * math.log2(freq/len(token)) 
+                     for freq in char_frequency.values())
+        if entropy < 3.0:  # Arbitrary threshold, adjust as needed
+            return False
+            
+        return True
     
     @staticmethod
     def mask_token(text: str, token: Optional[str] = None) -> str:

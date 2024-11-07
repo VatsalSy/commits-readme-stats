@@ -4,7 +4,7 @@ from re import search
 from datetime import datetime, timedelta
 from typing import Dict, Tuple, List
 import os
-from hashlib import md5
+from hashlib import sha256
 
 from .manager_download import DownloadManager as DM
 from .manager_environment import EnvironmentManager as EM
@@ -26,7 +26,7 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     DBM.i("Calculating commit data...")
     
     # Create cache filename with username (using hash for safety)
-    cache_filename = f"commits_{md5(target_username.encode()).hexdigest()}.pick"
+    cache_filename = f"commits_{sha256(target_username.encode()).hexdigest()}.json"
     
     # Try to load cached data if it's recent enough
     use_cache = False
