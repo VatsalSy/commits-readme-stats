@@ -230,3 +230,34 @@ class GitHubManager:
         except Exception as e:
             DBM.i(f"Error checking user existence: {str(e)}")
             return False
+
+    @staticmethod
+    def init_repo():
+        """Initialize repository connection"""
+        GitHubManager._REMOTE_NAME = f"{GitHubManager.USER.login}/{GitHubManager.USER.login}"
+        # Use HTTPS URL without credentials
+        GitHubManager._REPO_PATH = f"https://github.com/{GitHubManager._REMOTE_NAME}.git"
+        
+        try:
+            # If repo directory exists, remove it
+            if os.path.exists("repo"):
+                rmtree("repo")
+                
+            # Clone using GitPython with credentials configured via environment
+            from git import Repo
+            git_env = os.environ.copy()
+            # Configure git to use token via environment
+            git_env["GIT_ASKPASS"] = "echo"
+            git_env["GIT_USERNAME"] = GitHubManager.USER.login
+            git_env["GIT_PASSWORD"] = EM.GH_TOKEN
+            
+            Repo.clone_from(
+                GitHubManager._REPO_PATH,
+                "repo",
+                env=git_env
+            )
+            DBM.g("Repository cloned successfully")
+            
+        except Exception as e:
+            DBM.p(f"Error cloning repository: {str(e)}")
+            raise
