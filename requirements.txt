@@ -7,7 +7,7 @@ httpx==0.23.3
 humanize==4.9.0
 
 # Environment variables
-python-dotenv==1.0.0
+python-dotenv==1.0.1
 
 # Time zone handling
 pytz==2024.1
