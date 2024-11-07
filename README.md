@@ -18,6 +18,12 @@
    <a href="https://github.com/VatsalSy/commits-readme-stats">
       <img src="https://img.shields.io/static/v1?label=%F0%9F%8C%9F&message=If%20Useful&style=style=flat&color=BC4E99" alt="Star Badge"/>
    </a>
+   <a href="https://github.com/VatsalSy/commits-readme-stats/actions/workflows/security-audit.yml">
+      <img src="https://github.com/VatsalSy/commits-readme-stats/actions/workflows/security-audit.yml/badge.svg" alt="Security Audit"/>
+   </a>
+   <a href="https://github.com/VatsalSy/commits-readme-stats/releases">
+      <img src="https://img.shields.io/github/v/release/VatsalSy/commits-readme-stats?include_prereleases" alt="GitHub release"/>
+   </a>
 </p>
 
 
@@ -52,6 +58,39 @@ python github_stats.py <username>
 You'll need a [GitHub Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) with:
 - `repo` scope for repository access
 - `user` scope for user data access
+
+## Usage as GitHub Action
+
+1. Create `.github/workflows/github-stats.yml`:
+```yaml
+name: GitHub Stats Update
+on:
+schedule:
+cron: '0 0 ' # Runs daily at midnight
+workflow_dispatch: # Allows manual trigger
+jobs:
+update-stats:
+runs-on: ubuntu-latest
+steps:
+uses: VatsalSy/commits-readme-stats@v1.0.0
+with:
+GH_TOKEN: ${{ secrets.GH_TOKEN }}
+SHOW_COMMIT: true
+SHOW_DAYS_OF_WEEK: true
+COMMIT_MESSAGE: 'docs(stats): update github stats'
+```
+
+
+2. Add `GH_TOKEN` to your repository secrets with the required permissions.
+
+3. Add these markers to your README.md where you want the stats to appear:
+
+```markdown
+<!--START_SECTION:github-stats-->
+<!--END_SECTION:github-stats-->
+```
+
+
 
 ## License
 
