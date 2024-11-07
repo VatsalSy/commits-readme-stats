@@ -1,30 +1,27 @@
 import os
 import sys
+import argparse
 from asyncio import run
 from datetime import datetime, timezone
 
-from dotenv import load_dotenv
+# Set up argument parser
+parser = argparse.ArgumentParser(description='Generate GitHub statistics for a user')
+parser.add_argument('username', type=str, help='GitHub username to analyze')
+args = parser.parse_args()
 
-# Add the project root to Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Set DEBUG_RUN to True for local testing
+# Environment setup
 os.environ["DEBUG_RUN"] = "True"
 os.environ["INPUT_DEBUG_LOGGING"] = "True"
+os.environ["INPUT_IGNORED_REPOS"] = ""
+os.environ["INPUT_SYMBOL_VERSION"] = "1"
+os.environ["INPUT_INCLUDE_ALL_COMMITS"] = "true"  # Include all commits
+os.environ["INPUT_REQUEST_PRIVATE"] = "true"      # Include private repos
+os.environ["INPUT_INCLUDE_ORG"] = "true"         # Include organization repos
 
-# Add this near the top where other environment variables are set
-os.environ["INPUT_IGNORED_REPOS"] = ""  # or a comma-separated list of repos to ignore
-os.environ["INPUT_SYMBOL_VERSION"] = "1"  # or "2" or "3" depending on which style you want
-
-# Make sure we have a GitHub token
+# Read GitHub token from environment or prompt user
 if "INPUT_GH_TOKEN" not in os.environ:
-    print("ERROR: Please set INPUT_GH_TOKEN in your .env file")
-    print("You can get a token from: https://github.com/settings/tokens")
-    print("Required scopes: repo, user")
-    sys.exit(1)
+    token = input("Please enter your GitHub token: ")
+    os.environ["INPUT_GH_TOKEN"] = token
 
 async def run_local():
     print("Starting local GitHub stats generation...")
@@ -39,7 +36,7 @@ async def run_local():
     init_debug_manager()
     init_github_manager()
     
-    github_username = "VatsalSy"  # Change this to test different users
+    github_username = args.username  # Get username from command line arguments
     print(f"\nGenerating stats for user: {github_username}")
     
     # Validate if user exists before proceeding
