@@ -4,6 +4,9 @@ from time import time
 from shutil import rmtree
 from dotenv import load_dotenv
 from asyncio import run
+from git.exc import GitCommandError
+
+from sources.manager_debug import DebugManager as DBM
 
 async def run_local():
     """Run the stats generator locally"""
@@ -55,8 +58,22 @@ async def run_local():
         print(stats)
         DBM.i("=" * 50)
         
+    except GitCommandError as e:
+        error_msg = DBM.handle_error(
+            e,
+            context="GitHub operation failed",
+            mask_token=True
+        )
+        print(f"Error: {error_msg}")
+        
     except Exception as e:
-        print(f"Error: {str(e)}")
+        error_msg = DBM.handle_error(
+            e,
+            context="Stats generation failed",
+            mask_token=True
+        )
+        print(f"Error: {error_msg}")
+        
     finally:
         # Ensure cleanup happens
         if os.path.exists("repo"):

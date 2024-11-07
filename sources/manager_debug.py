@@ -67,6 +67,40 @@ class DebugManager:
         message = DebugManager._process_template(message, kwargs)
         DebugManager._logger.error(f"{DebugManager._COLOR_RED}{message}{DebugManager._COLOR_RESET}")
 
+    @staticmethod
+    def handle_error(error: Exception, context: str = "", mask_token: bool = True) -> str:
+        """
+        Securely handle and format error messages
+        
+        :param error: The exception to handle
+        :param context: Optional context about where the error occurred
+        :param mask_token: Whether to mask sensitive tokens in the message
+        :return: Sanitized error message
+        """
+        from .manager_token import TokenManager
+        
+        # Get base error message
+        error_msg = str(error)
+        
+        # Mask tokens if requested
+        if mask_token:
+            error_msg = TokenManager.mask_token(error_msg)
+        
+        # Create generic message for production
+        if not EM.DEBUG_RUN:
+            if "permission denied" in error_msg.lower():
+                return "Access denied - please check your permissions"
+            elif "authentication failed" in error_msg.lower():
+                return "Authentication failed - please verify your credentials"
+            elif "not found" in error_msg.lower():
+                return "Requested resource not found"
+            else:
+                return "An error occurred processing your request"
+        
+        # Return detailed message for debug mode
+        prefix = f"{context}: " if context else ""
+        return f"{prefix}{error_msg}"
+
 
 def init_debug_manager():
     """Initialize debug manager with appropriate log level"""

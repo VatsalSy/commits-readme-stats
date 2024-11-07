@@ -11,6 +11,7 @@ from .manager_environment import EnvironmentManager as EM
 from .manager_github import GitHubManager as GHM
 from .manager_file import FileManager as FM
 from .manager_debug import DebugManager as DBM
+from .manager_token import TokenManager
 
 
 async def calculate_commit_data(repositories: List[Dict], target_username: str) -> Tuple[Dict, Dict]:
@@ -80,61 +81,63 @@ async def update_data_with_commit_stats(repo_details: Dict, yearly_data: Dict, d
             owner=repo_details["owner"]["login"],
             name=repo_details["name"]
         )
-        
-        # Extract branch names from the response structure
-        branches = [branch["name"] for branch in branches_data["repository"]["refs"]["nodes"]]
-        
-        # Track unique commit IDs
-        unique_commits = set()
-        
-        for branch_name in branches:
-            try:
-                commits = await DM.get_remote_graphql(
-                    "repo_commit_list",
-                    owner=repo_details["owner"]["login"],
-                    name=repo_details["name"],
-                    branch=branch_name
-                )
-                
-                # Get the commit history nodes
-                user_commits = [
-                    commit for commit in commits["repository"]["ref"]["target"]["history"]["nodes"]
-                    if commit["author"]["user"] and commit["author"]["user"]["login"] == target_username
-                    and commit["oid"] not in unique_commits  # Only process new commits
-                ]
-                
-                # Add commit IDs to the set
-                for commit in user_commits:
-                    unique_commits.add(commit["oid"])
-                    
-                    date = search(r"\d+-\d+-\d+", commit["committedDate"]).group()
-                    curr_year = datetime.fromisoformat(date).year
-                    quarter = (datetime.fromisoformat(date).month - 1) // 3 + 1
-
-                    if repo_details["name"] not in date_data:
-                        date_data[repo_details["name"]] = dict()
-                    if branch_name not in date_data[repo_details["name"]]:
-                        date_data[repo_details["name"]][branch_name] = dict()
-                    date_data[repo_details["name"]][branch_name][commit["oid"]] = commit["committedDate"]
-
-                    if repo_details["primaryLanguage"] is not None:
-                        if curr_year not in yearly_data:
-                            yearly_data[curr_year] = dict()
-                        if quarter not in yearly_data[curr_year]:
-                            yearly_data[curr_year][quarter] = dict()
-                        if repo_details["primaryLanguage"]["name"] not in yearly_data[curr_year][quarter]:
-                            yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]] = {"add": 0, "del": 0}
-                        yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["add"] += commit["additions"]
-                        yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["del"] += commit["deletions"]
-                        
-            except Exception as e:
-                DBM.w(f"\t\tError processing branch {branch_name}: {str(e)}")
-        
-        # Print repository info with unique commit count
-        DBM.i(f"\t\t{repo_details['owner']['login']}/{repo_details['name']}: {len(unique_commits)} commits")
-                
     except Exception as e:
-        DBM.w(f"\t\tError processing repository {repo_details['name']}: {str(e)}")
+        # Use TokenManager to mask any sensitive info in error message
+        error_msg = TokenManager.mask_token(str(e))
+        DBM.w(f"\t\tError fetching branches: {error_msg}")
+        return
+    
+    # Extract branch names from the response structure
+    branches = [branch["name"] for branch in branches_data["repository"]["refs"]["nodes"]]
+    
+    # Track unique commit IDs
+    unique_commits = set()
+    
+    for branch_name in branches:
+        try:
+            commits = await DM.get_remote_graphql(
+                "repo_commit_list",
+                owner=repo_details["owner"]["login"],
+                name=repo_details["name"],
+                branch=branch_name
+            )
+            
+            # Get the commit history nodes
+            user_commits = [
+                commit for commit in commits["repository"]["ref"]["target"]["history"]["nodes"]
+                if commit["author"]["user"] and commit["author"]["user"]["login"] == target_username
+                and commit["oid"] not in unique_commits  # Only process new commits
+            ]
+            
+            # Add commit IDs to the set
+            for commit in user_commits:
+                unique_commits.add(commit["oid"])
+                
+                date = search(r"\d+-\d+-\d+", commit["committedDate"]).group()
+                curr_year = datetime.fromisoformat(date).year
+                quarter = (datetime.fromisoformat(date).month - 1) // 3 + 1
+
+                if repo_details["name"] not in date_data:
+                    date_data[repo_details["name"]] = dict()
+                if branch_name not in date_data[repo_details["name"]]:
+                    date_data[repo_details["name"]][branch_name] = dict()
+                date_data[repo_details["name"]][branch_name][commit["oid"]] = commit["committedDate"]
+
+                if repo_details["primaryLanguage"] is not None:
+                    if curr_year not in yearly_data:
+                        yearly_data[curr_year] = dict()
+                    if quarter not in yearly_data[curr_year]:
+                        yearly_data[curr_year][quarter] = dict()
+                    if repo_details["primaryLanguage"]["name"] not in yearly_data[curr_year][quarter]:
+                        yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]] = {"add": 0, "del": 0}
+                    yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["add"] += commit["additions"]
+                    yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["del"] += commit["deletions"]
+                    
+        except Exception as e:
+            DBM.w(f"\t\tError processing branch {branch_name}: {str(e)}")
+    
+    # Print repository info with unique commit count
+    DBM.i(f"\t\t{repo_details['owner']['login']}/{repo_details['name']}: {len(unique_commits)} commits")
 
     if not EM.DEBUG_RUN:
         await sleep(0.4)
