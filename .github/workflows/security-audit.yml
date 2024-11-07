@@ -29,8 +29,7 @@ jobs:
           
       - name: Run safety check
         run: |
-          pip install safety
-          safety scan --api-key '' --no-prompt -r requirements.txt
+          safety check -r requirements.txt --full-report
         
       - name: Run bandit
         run: bandit -r . -ll -ii -x ./tests,./venv
