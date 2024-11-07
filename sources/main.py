@@ -41,6 +41,10 @@ async def get_stats() -> str:
 
     DBM.i(f"Repository stats collection completed in {datetime.now() - start_time}")
     DBM.g("Stats for README collected!")
+    
+    # Update using the GHM alias that's already imported
+    GHM.update_readme(stats)
+    
     return stats
 
 

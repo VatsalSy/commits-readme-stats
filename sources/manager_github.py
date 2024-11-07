@@ -12,6 +12,7 @@ from github import Github, AuthenticatedUser, Repository
 from .manager_environment import EnvironmentManager as EM
 from .manager_file import FileManager as FM
 from .manager_debug import DebugManager as DBM
+from .manager_token import TokenManager
 
 
 def init_github_manager():
@@ -44,22 +45,33 @@ class GitHubManager:
         - Named repo of the user [username]/[username].
         - Clone of the named repo.
         """
-        github = Github(EM.GH_TOKEN)
-        clone_path = "repo"
-        GitHubManager.USER = github.get_user()
-        rmtree(clone_path, ignore_errors=True)
+        try:
+            github = Github(EM.GH_TOKEN)
+            clone_path = "repo"
+            GitHubManager.USER = github.get_user()
+            rmtree(clone_path, ignore_errors=True)
 
-        GitHubManager._REMOTE_NAME = f"{GitHubManager.USER.login}/{GitHubManager.USER.login}"
-        GitHubManager._REPO_PATH = f"https://{EM.GH_TOKEN}@github.com/{GitHubManager._REMOTE_NAME}.git"
-
-        GitHubManager.REMOTE = github.get_repo(GitHubManager._REMOTE_NAME)
-        GitHubManager.REPO = Repo.clone_from(GitHubManager._REPO_PATH, to_path=clone_path)
-
-        if EM.COMMIT_SINGLE:
-            GitHubManager.REPO.git.checkout(GitHubManager.branch(EM.PULL_BRANCH_NAME))
-            GitHubManager.REPO.git.checkout("--orphan", GitHubManager._SINGLE_COMMIT_BRANCH)
-        else:
-            GitHubManager.REPO.git.checkout(GitHubManager.branch(EM.PUSH_BRANCH_NAME))
+            GitHubManager._REMOTE_NAME = f"{GitHubManager.USER.login}/{GitHubManager.USER.login}"
+            repo_url = f"https://github.com/{GitHubManager._REMOTE_NAME}.git"
+            
+            # Use secure credential helper instead of token in URL
+            credentials = TokenManager.get_credentials_helper()
+            DBM.i(f"Cloning from: {repo_url}")
+            
+            # Clone using credential helper environment
+            GitHubManager.REMOTE = github.get_repo(GitHubManager._REMOTE_NAME)
+            GitHubManager.REPO = Repo.clone_from(
+                repo_url, 
+                to_path=clone_path,
+                env=credentials
+            )
+            
+            DBM.g("Repository cloned successfully")
+            
+        except Exception as e:
+            error_msg = TokenManager.mask_token(str(e))
+            DBM.p(f"Error preparing GitHub environment: {error_msg}")
+            raise
 
     @staticmethod
     def _get_author() -> Actor:
@@ -99,24 +111,44 @@ class GitHubManager:
         GitHubManager.REPO.git.add(dst_path)
 
     @staticmethod
-    def update_readme(stats: str):
+    def update_readme(stats: str) -> None:
         """
-        Updates readme with given data if necessary.
-        Uses commit author, commit message and branch name specified by environmental variables.
+        Updates README.md content between section markers with new stats.
         """
-        DBM.i("Updating README...")
-        readme_path = join(GitHubManager.REPO.working_tree_dir, GitHubManager.REMOTE.get_readme().path)
-
-        with open(readme_path, "r") as readme_file:
-            readme_contents = readme_file.read()
-        readme_stats = f"{GitHubManager._START_COMMENT}\n{stats}\n{GitHubManager._END_COMMENT}"
-        new_readme = sub(GitHubManager._README_REGEX, readme_stats, readme_contents)
-
-        with open(readme_path, "w") as readme_file:
-            readme_file.write(new_readme)
-
-        GitHubManager.REPO.git.add(readme_path)
-        DBM.g("README updated!")
+        readme_path = "repo/README.md"
+        
+        try:
+            # Read current README content
+            with open(readme_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            # Replace content between markers
+            start_marker = GitHubManager._START_COMMENT
+            end_marker = GitHubManager._END_COMMENT
+            
+            # Create new content with stats
+            new_content = f"{start_marker}\n{stats}{end_marker}"
+            
+            # Replace old section with new content
+            import re
+            if re.search(GitHubManager._README_REGEX, content):
+                updated_content = re.sub(
+                    GitHubManager._README_REGEX,
+                    new_content,
+                    content
+                )
+            else:
+                # If markers don't exist, append to end
+                updated_content = f"{content}\n{new_content}"
+                
+            # Write updated content back to README
+            with open(readme_path, "w", encoding="utf-8") as f:
+                f.write(updated_content)
+                
+            DBM.g("README.md updated successfully!")
+            
+        except Exception as e:
+            DBM.p(f"Error updating README: {str(e)}")
 
     @staticmethod
     def update_chart(name: str, path: str) -> str:
@@ -198,3 +230,34 @@ class GitHubManager:
         except Exception as e:
             DBM.i(f"Error checking user existence: {str(e)}")
             return False
+
+    @staticmethod
+    def init_repo():
+        """Initialize repository connection"""
+        GitHubManager._REMOTE_NAME = f"{GitHubManager.USER.login}/{GitHubManager.USER.login}"
+        # Use HTTPS URL without credentials
+        GitHubManager._REPO_PATH = f"https://github.com/{GitHubManager._REMOTE_NAME}.git"
+        
+        try:
+            # If repo directory exists, remove it
+            if os.path.exists("repo"):
+                rmtree("repo")
+                
+            # Clone using GitPython with credentials configured via environment
+            from git import Repo
+            git_env = os.environ.copy()
+            # Configure git to use token via environment
+            git_env["GIT_ASKPASS"] = "echo"
+            git_env["GIT_USERNAME"] = GitHubManager.USER.login
+            git_env["GIT_PASSWORD"] = EM.GH_TOKEN
+            
+            Repo.clone_from(
+                GitHubManager._REPO_PATH,
+                "repo",
+                env=git_env
+            )
+            DBM.g("Repository cloned successfully")
+            
+        except Exception as e:
+            DBM.p(f"Error cloning repository: {str(e)}")
+            raise

@@ -1,0 +1,38 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Run weekly
+  push:
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+  pull_request:
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          
+      - name: Install dependencies
+        run: |
+          pip install bandit safety pip-audit
+          
+      - name: Run safety check
+        run: |
+          safety check -r requirements.txt --full-report
+        
+      - name: Run bandit
+        run: bandit -r . -ll -ii -x ./tests,./venv
+
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt
