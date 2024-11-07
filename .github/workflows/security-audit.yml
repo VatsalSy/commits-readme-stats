@@ -28,7 +28,9 @@ jobs:
           pip install bandit safety pip-audit
           
       - name: Run safety check
-        run: safety scan -r requirements.txt
+        run: |
+          pip install safety
+          safety scan --api-key '' --no-prompt -r requirements.txt
         
       - name: Run bandit
         run: bandit -r . -ll -ii -x ./tests,./venv
