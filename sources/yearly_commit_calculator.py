@@ -4,6 +4,7 @@ from re import search
 from datetime import datetime, timedelta
 from typing import Dict, Tuple, List
 import os
+from hashlib import md5
 
 from .manager_download import DownloadManager as DM
 from .manager_environment import EnvironmentManager as EM
@@ -14,7 +15,7 @@ from .manager_debug import DebugManager as DBM
 
 async def calculate_commit_data(repositories: List[Dict], target_username: str) -> Tuple[Dict, Dict]:
     """
-    Calculate commit data by years.
+    Calculate commit data by years with secure caching.
     Commit data includes contribution additions and deletions in each quarter of each recorded year.
 
     :param repositories: user repositories info dictionary.
@@ -23,29 +24,28 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     """
     DBM.i("Calculating commit data...")
     
-    # Create cache filename with username
-    cache_filename = f"commits_data_{target_username}.pick"
-    cache_path = os.path.join("assets", cache_filename)
-    
-    # Check if cache exists and is recent (less than 4 hours old)
-    use_cache = False
-    if os.path.exists(cache_path):
-        file_modified_time = datetime.fromtimestamp(os.path.getmtime(cache_path))
-        time_difference = datetime.now() - file_modified_time
-        use_cache = time_difference < timedelta(hours=4)
-        
-        if use_cache:
-            DBM.i(f"Using cached data from {file_modified_time}")
-        else:
-            DBM.i(f"Cache exists but is too old ({time_difference.total_seconds()/3600:.1f} hours)")
+    # Create cache filename with username (using hash for safety)
+    cache_filename = f"commits_{md5(target_username.encode()).hexdigest()}.pick"
     
     # Try to load cached data if it's recent enough
-    if use_cache:
+    use_cache = False
+    try:
         cached_data = FM.cache_binary(cache_filename, assets=True)
         if cached_data is not None:
-            DBM.i("Commit data restored from cache!")
-            return cached_data[0], cached_data[1]
-    
+            yearly_data, date_data = cached_data
+            
+            # Validate cache structure
+            if (isinstance(yearly_data, dict) and 
+                isinstance(date_data, dict) and
+                all(isinstance(k, (int, str)) for k in yearly_data.keys())):
+                
+                DBM.i("Commit data restored from cache!")
+                return yearly_data, date_data
+            else:
+                DBM.w("Cache data validation failed - fetching fresh data")
+    except Exception as e:
+        DBM.w(f"Cache load failed: {str(e)} - fetching fresh data")
+
     DBM.i("Fetching fresh commit data...")
     yearly_data = dict()
     date_data = dict()
