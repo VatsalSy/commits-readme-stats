@@ -17,7 +17,7 @@ flake8==6.0.0
 black==24.3.0
 
 # Add encryption support
-cryptography==42.0.8
+cryptography==43.0.1
 
 # Development tools
 pre-commit==3.6.0
