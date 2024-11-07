@@ -9,6 +9,7 @@ from httpx import AsyncClient
 
 from .manager_environment import EnvironmentManager as EM
 from .manager_debug import DebugManager as DBM
+from .manager_token import TokenManager
 
 GITHUB_API_QUERIES = {
     "user_repository_list": """
@@ -113,48 +114,55 @@ class DownloadManager:
     @staticmethod
     async def _fetch_graphql_query(query: str, variables: Dict) -> Dict:
         """Execute a GraphQL query and return the results."""
-        if query not in GITHUB_API_QUERIES:
-            raise ValueError(f"Unknown query: {query}")
+        try:
+            if query not in GITHUB_API_QUERIES:
+                raise ValueError(f"Unknown query: {query}")
 
-        query_str = GITHUB_API_QUERIES[query]
-        all_nodes = []
-        has_next_page = True
-        end_cursor = None
+            query_str = GITHUB_API_QUERIES[query]
+            all_nodes = []
+            has_next_page = True
+            end_cursor = None
 
-        while has_next_page:
-            # Add cursor to variables if we're paginating
-            if end_cursor:
-                variables["after"] = end_cursor
+            while has_next_page:
+                if end_cursor:
+                    variables["after"] = end_cursor
 
-            DBM.i(f"Sending GraphQL query: {query} {'with cursor' if end_cursor else ''}")
-            response = await DownloadManager._CLIENT.post(
-                "https://api.github.com/graphql",
-                json={
-                    "query": query_str,
-                    "variables": variables
-                }
-            )
-            
-            if response.status_code != 200:
-                raise Exception(f"GraphQL query failed: {response.text}")
+                DBM.i(f"Sending GraphQL query: {query} {'with cursor' if end_cursor else ''}")
+                response = await DownloadManager._CLIENT.post(
+                    "https://api.github.com/graphql",
+                    json={
+                        "query": query_str,
+                        "variables": variables
+                    }
+                )
                 
-            data = response.json()
-            if "errors" in data:
-                raise Exception(f"GraphQL errors: {data['errors']}")
+                if response.status_code != 200:
+                    error_text = TokenManager.mask_token(response.text)
+                    raise Exception(f"GraphQL query failed: {error_text}")
+                    
+                data = response.json()
+                if "errors" in data:
+                    error_text = TokenManager.mask_token(str(data['errors']))
+                    raise Exception(f"GraphQL errors: {error_text}")
                 
-            # Handle different query types
-            if query == "user_repository_list":
-                repos = data["data"]["user"]["repositories"]
-                all_nodes.extend(repos["nodes"])
-                has_next_page = repos["pageInfo"]["hasNextPage"]
-                end_cursor = repos["pageInfo"]["endCursor"]
-            else:
-                return data["data"]  # Other queries don't need pagination yet
-            
-            if not has_next_page:
-                break
+                # Handle different query types
+                if query == "user_repository_list":
+                    repos = data["data"]["user"]["repositories"]
+                    all_nodes.extend(repos["nodes"])
+                    has_next_page = repos["pageInfo"]["hasNextPage"]
+                    end_cursor = repos["pageInfo"]["endCursor"]
+                else:
+                    return data["data"]  # Other queries don't need pagination yet
+                
+                if not has_next_page:
+                    break
 
-        return all_nodes if query == "user_repository_list" else data["data"]
+            return all_nodes if query == "user_repository_list" else data["data"]
+        except Exception as e:
+            # Mask any token in error message
+            error_msg = TokenManager.mask_token(str(e))
+            DBM.p(f"Error executing GraphQL query: {error_msg}")
+            raise
 
     @staticmethod
     async def close_remote_resources():
