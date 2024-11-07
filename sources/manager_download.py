@@ -12,12 +12,13 @@ from .manager_debug import DebugManager as DBM
 
 GITHUB_API_QUERIES = {
     "user_repository_list": """
-query($username: String!) {
+query($username: String!, $after: String) {
     user(login: $username) {
         repositories(
             first: 100,
+            after: $after,
             orderBy: {field: CREATED_AT, direction: DESC},
-            ownerAffiliations: [OWNER],
+            ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR],
             isFork: false
         ) {
             nodes {
@@ -116,31 +117,44 @@ class DownloadManager:
             raise ValueError(f"Unknown query: {query}")
 
         query_str = GITHUB_API_QUERIES[query]
-        DBM.i(f"Sending GraphQL query: {query}")
-        response = await DownloadManager._CLIENT.post(
-            "https://api.github.com/graphql",
-            json={
-                "query": query_str,
-                "variables": variables
-            }
-        )
-        
-        if response.status_code != 200:
-            raise Exception(f"GraphQL query failed: {response.text}")
+        all_nodes = []
+        has_next_page = True
+        end_cursor = None
+
+        while has_next_page:
+            # Add cursor to variables if we're paginating
+            if end_cursor:
+                variables["after"] = end_cursor
+
+            DBM.i(f"Sending GraphQL query: {query} {'with cursor' if end_cursor else ''}")
+            response = await DownloadManager._CLIENT.post(
+                "https://api.github.com/graphql",
+                json={
+                    "query": query_str,
+                    "variables": variables
+                }
+            )
             
-        data = response.json()
-        if "errors" in data:
-            raise Exception(f"GraphQL errors: {data['errors']}")
+            if response.status_code != 200:
+                raise Exception(f"GraphQL query failed: {response.text}")
+                
+            data = response.json()
+            if "errors" in data:
+                raise Exception(f"GraphQL errors: {data['errors']}")
+                
+            # Handle different query types
+            if query == "user_repository_list":
+                repos = data["data"]["user"]["repositories"]
+                all_nodes.extend(repos["nodes"])
+                has_next_page = repos["pageInfo"]["hasNextPage"]
+                end_cursor = repos["pageInfo"]["endCursor"]
+            else:
+                return data["data"]  # Other queries don't need pagination yet
             
-        # Handle different query types
-        if query == "user_repository_list":
-            return data["data"]["user"]["repositories"]["nodes"]
-        elif query == "repo_branch_list":
-            return data["data"]["repository"]["refs"]["nodes"]
-        elif query == "repo_commit_list":
-            return data["data"]  # Return full data structure for commits
-        else:
-            return data["data"]
+            if not has_next_page:
+                break
+
+        return all_nodes if query == "user_repository_list" else data["data"]
 
     @staticmethod
     async def close_remote_resources():

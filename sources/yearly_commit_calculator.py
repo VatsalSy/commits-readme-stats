@@ -74,65 +74,57 @@ async def update_data_with_commit_stats(repo_details: Dict, yearly_data: Dict, d
     :param date_data: Commit date dictionary to update.
     :param target_username: GitHub username of the authenticated user.
     """
-    owner = repo_details["owner"]["login"]
-    branch_data = await DM.get_remote_graphql("repo_branch_list", owner=owner, name=repo_details["name"])
-    if len(branch_data) == 0:
-        DBM.w("\t\tSkipping repo.")
-        return
+    try:
+        branches_data = await DM.get_remote_graphql(
+            "repo_branch_list",
+            owner=repo_details["owner"]["login"],
+            name=repo_details["name"]
+        )
+        
+        # Extract branch names from the response structure
+        branches = [branch["name"] for branch in branches_data["repository"]["refs"]["nodes"]]
+        
+        for branch_name in branches:
+            try:
+                commits = await DM.get_remote_graphql(
+                    "repo_commit_list",
+                    owner=repo_details["owner"]["login"],
+                    name=repo_details["name"],
+                    branch=branch_name
+                )
+                
+                # Get the commit history nodes
+                user_commits = [
+                    commit for commit in commits["repository"]["ref"]["target"]["history"]["nodes"]
+                    if commit["author"]["user"] and commit["author"]["user"]["login"] == target_username
+                ]
+                
+                for commit in user_commits:
+                    date = search(r"\d+-\d+-\d+", commit["committedDate"]).group()
+                    curr_year = datetime.fromisoformat(date).year
+                    quarter = (datetime.fromisoformat(date).month - 1) // 3 + 1
 
-    for branch in branch_data:
-        try:
-            commit_data = await DM.get_remote_graphql(
-                "repo_commit_list", 
-                owner=owner, 
-                name=repo_details["name"], 
-                branch=branch["name"]
-            )
-            
-            # Get the commit history nodes
-            commits = commit_data.get("repository", {}).get("ref", {}).get("target", {}).get("history", {}).get("nodes", [])
-            
-            # More robust filtering of commits
-            user_commits = []
-            for commit in commits:
-                if commit is None:
-                    continue
-                    
-                author = commit.get("author", {})
-                if author is None:
-                    continue
-                    
-                user = author.get("user")
-                if user is None:
-                    continue
-                    
-                if user.get("login") == target_username:
-                    user_commits.append(commit)
-            
-            for commit in user_commits:
-                date = search(r"\d+-\d+-\d+", commit["committedDate"]).group()
-                curr_year = datetime.fromisoformat(date).year
-                quarter = (datetime.fromisoformat(date).month - 1) // 3 + 1
+                    if repo_details["name"] not in date_data:
+                        date_data[repo_details["name"]] = dict()
+                    if branch_name not in date_data[repo_details["name"]]:
+                        date_data[repo_details["name"]][branch_name] = dict()
+                    date_data[repo_details["name"]][branch_name][commit["oid"]] = commit["committedDate"]
 
-                if repo_details["name"] not in date_data:
-                    date_data[repo_details["name"]] = dict()
-                if branch["name"] not in date_data[repo_details["name"]]:
-                    date_data[repo_details["name"]][branch["name"]] = dict()
-                date_data[repo_details["name"]][branch["name"]][commit["oid"]] = commit["committedDate"]
+                    if repo_details["primaryLanguage"] is not None:
+                        if curr_year not in yearly_data:
+                            yearly_data[curr_year] = dict()
+                        if quarter not in yearly_data[curr_year]:
+                            yearly_data[curr_year][quarter] = dict()
+                        if repo_details["primaryLanguage"]["name"] not in yearly_data[curr_year][quarter]:
+                            yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]] = {"add": 0, "del": 0}
+                        yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["add"] += commit["additions"]
+                        yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["del"] += commit["deletions"]
+                        
+            except Exception as e:
+                DBM.w(f"\t\tError processing branch {branch_name}: {str(e)}")
+                
+    except Exception as e:
+        DBM.w(f"\t\tError processing repository {repo_details['name']}: {str(e)}")
 
-                if repo_details["primaryLanguage"] is not None:
-                    if curr_year not in yearly_data:
-                        yearly_data[curr_year] = dict()
-                    if quarter not in yearly_data[curr_year]:
-                        yearly_data[curr_year][quarter] = dict()
-                    if repo_details["primaryLanguage"]["name"] not in yearly_data[curr_year][quarter]:
-                        yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]] = {"add": 0, "del": 0}
-                    yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["add"] += commit["additions"]
-                    yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["del"] += commit["deletions"]
-
-        except Exception as e:
-            DBM.w(f"\t\tError processing branch {branch['name']}: {str(e)}")
-            continue
-
-        if not EM.DEBUG_RUN:
-            await sleep(0.4)
+    if not EM.DEBUG_RUN:
+        await sleep(0.4)

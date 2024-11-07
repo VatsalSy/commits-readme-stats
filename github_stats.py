@@ -14,6 +14,9 @@ os.environ["DEBUG_RUN"] = "True"
 os.environ["INPUT_DEBUG_LOGGING"] = "True"
 os.environ["INPUT_IGNORED_REPOS"] = ""
 os.environ["INPUT_SYMBOL_VERSION"] = "1"
+os.environ["INPUT_INCLUDE_ALL_COMMITS"] = "true"  # Include all commits
+os.environ["INPUT_REQUEST_PRIVATE"] = "true"      # Include private repos
+os.environ["INPUT_INCLUDE_ORG"] = "true"         # Include organization repos
 
 # Read GitHub token from environment or prompt user
 if "INPUT_GH_TOKEN" not in os.environ:
