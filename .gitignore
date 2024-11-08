@@ -19,3 +19,7 @@ __pycache__/
 
 **/*.DS_Store
 **/*.secrets*
+**/workflow_dispatch.json
+**/.actrc
+.cache.key
+**/*log*
