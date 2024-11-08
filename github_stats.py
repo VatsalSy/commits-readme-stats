@@ -5,6 +5,7 @@ from shutil import rmtree
 from dotenv import load_dotenv
 from asyncio import run
 from git.exc import GitCommandError
+import argparse
 
 from sources.manager_debug import DebugManager as DBM
 
@@ -15,15 +16,16 @@ async def run_local():
         
         # Load environment variables
         load_dotenv()
-        os.environ["DEBUG_RUN"] = "True"
         
-        # Get username from command line args
-        if len(sys.argv) != 2:
-            print("Usage: python github_stats.py <username>")
-            return
-            
-        username = sys.argv[1]
-        os.environ["INPUT_USERNAME"] = username
+        # Parse command line arguments
+        parser = argparse.ArgumentParser(description='GitHub Stats Generator')
+        parser.add_argument('username', help='GitHub username')
+        parser.add_argument('--debug', action='store_true', help='Run in debug mode')
+        args = parser.parse_args()
+        
+        # Set debug environment variable based on flag
+        os.environ["DEBUG_RUN"] = str(args.debug)
+        os.environ["INPUT_USERNAME"] = args.username
         
         # Initialize managers
         from sources.manager_debug import DebugManager as DBM, init_debug_manager
@@ -43,7 +45,7 @@ async def run_local():
         init_github_manager()
         DBM.i("GitHub manager initialized")
         
-        await DM.init(username)
+        await DM.init(args.username)
         DBM.i("Download manager initialized")
         
         init_localization_manager()
@@ -53,10 +55,22 @@ async def run_local():
         from sources.main import get_stats
         stats = await get_stats()
         
-        DBM.i("\nGenerated Statistics:")
-        DBM.i("=" * 50)
-        print(stats)
-        DBM.i("=" * 50)
+        # If not in debug mode, commit and push changes
+        if not EM.DEBUG_RUN:
+            try:
+                # Update README with stats
+                GHM.update_readme(stats)
+                # Commit and push changes
+                GHM.commit_update()
+                DBM.i("Changes committed and pushed")
+            except Exception as e:
+                DBM.p(f"Error updating repository: {str(e)}")
+                raise
+        else:
+            DBM.i("\nGenerated Statistics:")
+            DBM.i("=" * 50)
+            print(stats)
+            DBM.i("=" * 50)
         
     except GitCommandError as e:
         error_msg = DBM.handle_error(

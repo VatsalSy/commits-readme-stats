@@ -16,3 +16,11 @@ repos:
     hooks:
     -   id: bandit
         args: ["-ll", "-ii", "-s", "B324"]
+
+-   repo: local
+    hooks:
+    -   id: no-pickle
+        name: Detect pickle usage
+        entry: pickle
+        language: pygrep
+        types: [python]

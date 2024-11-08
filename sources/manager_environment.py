@@ -1,6 +1,7 @@
 from os import getenv, environ
 from .manager_base import BaseEnvironmentManager
 from .manager_token import TokenManager
+from .manager_config import Configuration
 
 
 class EnvironmentManager(BaseEnvironmentManager):
@@ -24,6 +25,7 @@ class EnvironmentManager(BaseEnvironmentManager):
     LOCALE = getenv("INPUT_LOCALE", "en")
     DEBUG_LOGGING = getenv("INPUT_DEBUG_LOGGING", "0").lower() in BaseEnvironmentManager._TRUTHY
     DEBUG_RUN = getenv("DEBUG_RUN", "False").lower() in BaseEnvironmentManager._TRUTHY
+    USERNAME = getenv("INPUT_USERNAME", "")
 
     SYMBOL_VERSION = getenv("INPUT_SYMBOL_VERSION", "1")
 

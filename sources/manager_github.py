@@ -1,5 +1,6 @@
 from base64 import b64encode
-from os import environ, makedirs
+import os
+from os import environ, makedirs, path
 from os.path import dirname, join
 from random import choice
 from re import sub
@@ -181,22 +182,44 @@ class GitHubManager:
         """
         Commit update data to repository.
         """
-        actor = GitHubManager._get_author()
-        DBM.i("Committing files to repo...")
-        GitHubManager.REPO.index.commit(EM.COMMIT_MESSAGE, author=actor, committer=actor)
+        try:
+            # Use secure credential helper instead of token in URL
+            credentials = TokenManager.get_credentials_helper()
+            DBM.i(f"Setting up Git credentials for: {GitHubManager._REMOTE_NAME}")
+            
+            # Configure git environment with credentials
+            GitHubManager.REPO.git.update_environment(**credentials)
+            
+            # Add the README file to git
+            DBM.i("Adding README.md to git index...")
+            GitHubManager.REPO.index.add(['README.md'])
+            
+            actor = GitHubManager._get_author()
+            DBM.i(f"Committing as: {actor.name} <{actor.email}>")
+            GitHubManager.REPO.index.commit(EM.COMMIT_MESSAGE, author=actor, committer=actor)
 
-        if EM.COMMIT_SINGLE:
-            DBM.i("Pushing files to repo as a single commit...")
-            refspec = f"{GitHubManager._SINGLE_COMMIT_BRANCH}:{GitHubManager.branch(EM.PUSH_BRANCH_NAME)}"
-            headers = GitHubManager.REPO.remotes.origin.push(force=True, refspec=refspec)
-        else:
-            DBM.i("Pushing files to repo...")
-            headers = GitHubManager.REPO.remotes.origin.push()
+            if EM.COMMIT_SINGLE:
+                DBM.i("Pushing files to repo as a single commit...")
+                refspec = f"{GitHubManager._SINGLE_COMMIT_BRANCH}:{GitHubManager.branch(EM.PUSH_BRANCH_NAME)}"
+                DBM.i(f"Using refspec: {refspec}")
+                headers = GitHubManager.REPO.remotes.origin.push(force=True, refspec=refspec)
+            else:
+                DBM.i("Pushing files to repo...")
+                current_branch = GitHubManager.REPO.active_branch.name
+                DBM.i(f"Pushing current branch: {current_branch}")
+                headers = GitHubManager.REPO.remotes.origin.push()
 
-        if len(headers) == 0:
-            DBM.i(f"Repository push error: {headers}!")
-        else:
-            DBM.i("Repository synchronized!")
+            if len(headers) == 0:
+                raise Exception("Push failed - no headers returned")
+            else:
+                DBM.i(f"Push response: {headers}")
+                DBM.g("Repository synchronized!")
+
+        except Exception as e:
+            # Safely log error without exposing sensitive data
+            error_msg = TokenManager.mask_token(str(e))
+            DBM.p(f"Error in commit update: {error_msg}")
+            raise
 
     @staticmethod
     def set_github_output(stats: str):
@@ -243,21 +266,18 @@ class GitHubManager:
             if os.path.exists("repo"):
                 rmtree("repo")
                 
-            # Clone using GitPython with credentials configured via environment
-            from git import Repo
-            git_env = os.environ.copy()
-            # Configure git to use token via environment
-            git_env["GIT_ASKPASS"] = "echo"
-            git_env["GIT_USERNAME"] = GitHubManager.USER.login
-            git_env["GIT_PASSWORD"] = EM.GH_TOKEN
+            # Get credentials using the secure helper
+            credentials = TokenManager.get_credentials_helper()
             
+            # Clone using GitPython with secure credential handling
             Repo.clone_from(
                 GitHubManager._REPO_PATH,
                 "repo",
-                env=git_env
+                env=credentials
             )
             DBM.g("Repository cloned successfully")
             
         except Exception as e:
-            DBM.p(f"Error cloning repository: {str(e)}")
+            error_msg = TokenManager.mask_token(str(e))
+            DBM.p(f"Error cloning repository: {error_msg}")
             raise
