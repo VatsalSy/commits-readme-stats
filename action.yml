@@ -73,3 +73,7 @@ runs:
       run: |
         cd ${{ github.action_path }}
         python -m sources.main
+
+  branding:
+    icon: 'check-circle'
+    color: 'blue'
