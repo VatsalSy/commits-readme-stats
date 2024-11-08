@@ -71,4 +71,5 @@ runs:
         COMMIT_EMAIL: ${{ inputs.COMMIT_EMAIL }}
       working-directory: ${{ github.action_path }}
       run: |
-        PYTHONPATH=${{ github.action_path }} python sources/main.py
+        cd ${{ github.action_path }}
+        python -m sources.main

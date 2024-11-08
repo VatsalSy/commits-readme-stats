@@ -4,13 +4,13 @@ GitHub Commit Statistics Generator
 from asyncio import run
 from datetime import datetime
 
-from .manager_download import DownloadManager as DM
-from .manager_environment import EnvironmentManager as EM
-from .manager_github import init_github_manager, GitHubManager as GHM
-from .manager_file import init_localization_manager, FileManager as FM
-from .manager_debug import init_debug_manager, DebugManager as DBM
-from .yearly_commit_calculator import calculate_commit_data
-from .graphics_list_formatter import make_commit_day_time_list
+from sources.manager_download import DownloadManager as DM
+from sources.manager_environment import EnvironmentManager as EM
+from sources.manager_github import init_github_manager, GitHubManager as GHM
+from sources.manager_file import init_localization_manager, FileManager as FM
+from sources.manager_debug import init_debug_manager, DebugManager as DBM
+from sources.yearly_commit_calculator import calculate_commit_data
+from sources.graphics_list_formatter import make_commit_day_time_list
 
 
 async def collect_user_repositories(username: str):
