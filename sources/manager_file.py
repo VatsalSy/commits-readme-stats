@@ -155,15 +155,15 @@ class FileManager:
             
             # Create assets directory if needed
             if assets and not os.path.exists(base_dir):
-                os.makedirs(base_dir, mode=0o755)
+                os.makedirs(base_dir, mode=0o700)  # Directory permissions more restrictive
                 
             # Get validated safe path
             safe_path = FileManager._validate_safe_path(base_dir, name)
             
             # Write file with secure permissions
             with open(safe_path, "a" if append else "w", encoding="utf-8") as f:
-                # Set secure file permissions before writing
-                os.chmod(safe_path, 0o644)  # rw-r--r--
+                # Set restrictive file permissions before writing
+                os.chmod(safe_path, 0o600)  # rw------- owner only
                 f.write(content)
                 
         except Exception as e:
@@ -171,10 +171,11 @@ class FileManager:
 
     @staticmethod
     def cache_binary(name: str, content: Any = None, assets: bool = False) -> Optional[Any]:
-        """Enhanced secure cache with better encryption
+        """Enhanced secure cache with better encryption and token protection
         
         Uses JSON serialization instead of pickle for security.
         Pickle is deliberately avoided due to remote code execution risks.
+        Sensitive data like tokens are redacted before caching.
         """
         try:
             # Validate filename
@@ -196,10 +197,18 @@ class FileManager:
             fernet = Fernet(FileManager._get_encryption_key())
             
             if content is not None:
+                # Redact sensitive data before caching
+                if isinstance(content, (dict, list)):
+                    from .manager_token import TokenManager
+                    content = TokenManager.redact_sensitive_data(content)
+                
                 # Serialize data securely
                 json_data = json.dumps(content)
                 encrypted_data = fernet.encrypt(json_data.encode())
+                
+                # Set secure permissions before writing
                 with open(filepath, 'wb') as f:
+                    os.chmod(filepath, 0o600)  # Owner read/write only
                     f.write(encrypted_data)
                 return None
             
@@ -214,9 +223,8 @@ class FileManager:
             except FileNotFoundError:
                 return None
         except Exception as e:
-            # Use DBM for logging
-            error_msg = str(e)
-            if "token" in error_msg.lower():
-                error_msg = "[REDACTED TOKEN ERROR]"
+            # Use DBM for logging with redacted error
+            from .manager_token import TokenManager
+            error_msg = TokenManager.mask_token(str(e))
             DBM.w(f"Cache error: {error_msg}")
             return None

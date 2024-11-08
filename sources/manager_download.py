@@ -199,8 +199,26 @@ class DownloadManager:
                     continue
                     
                 if response.status_code != 200:
-                    error_text = TokenManager.mask_token(response.text)
-                    raise Exception(f"GraphQL query failed: {error_text}")
+                    # Mask sensitive information before logging or raising
+                    status_code = response.status_code
+                    masked_headers = {
+                        k: TokenManager.mask_token(str(v)) 
+                        for k, v in response.headers.items()
+                    }
+                    
+                    try:
+                        # Try to get JSON response for better error details
+                        error_data = response.json()
+                        masked_error = TokenManager.mask_token(str(error_data.get('message', '')))
+                    except:
+                        # Fallback to basic error if JSON parsing fails
+                        masked_error = f"HTTP {status_code}"
+                        
+                    error_msg = f"GraphQL query failed: {masked_error}"
+                    if EM.DEBUG_RUN:
+                        error_msg += f"\nHeaders: {masked_headers}"
+                        
+                    raise Exception(error_msg)
                     
                 data = response.json()
                 if "errors" in data:

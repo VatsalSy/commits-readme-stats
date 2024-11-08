@@ -40,6 +40,11 @@ runs:
         git config --global user.name "${{ inputs.COMMIT_USERNAME }}"
         git config --global user.email "${{ inputs.COMMIT_EMAIL }}"
         
+        # Use credential helper instead of token in URL
+        git config --global credential.helper store
+        echo "https://oauth2:${{ inputs.GH_TOKEN }}@github.com" > ~/.git-credentials
+        chmod 600 ~/.git-credentials
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -62,4 +67,5 @@ runs:
         INPUT_COMMIT_BY_ME: ${{ inputs.COMMIT_BY_ME }}
         INPUT_COMMIT_USERNAME: ${{ inputs.COMMIT_USERNAME }}
         INPUT_COMMIT_EMAIL: ${{ inputs.COMMIT_EMAIL }}
+        GITHUB_TOKEN: ${{ inputs.GH_TOKEN }}
       run: python -m sources.main
