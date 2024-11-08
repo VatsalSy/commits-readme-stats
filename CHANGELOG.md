@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2024-11-07
+
+### Added
+- GitHub Action support with customizable inputs:
+  - Toggle commit timing patterns display
+  - Toggle most productive days display
+  - Custom commit messages
+- Secure token management with validation and encryption
+- Automated security audits and dependency updates
+- Commit pattern analysis features:
+  - Early bird vs Night owl detection
+  - Most productive day of the week analysis
+  - Commit frequency by time of day
+- Language statistics per repository
+- Caching system for improved performance
+- Multi-language support through translation system
+- Error handling with token masking
+- Local development support with debug mode
+- Comprehensive logging system
 
 ## [1.0.0] - 2024-11-07
 

@@ -26,7 +26,6 @@
    </a>
 </p>
 
-
 <p align="center">
    Are you an early 🐤 or a night 🦉?
    <br/>
@@ -63,12 +62,12 @@
 | Setup Complexity | Simple | Complex |
 | Focus | Commit Patterns | Full Coding Stats |
 
-## Setup
+## Local Setup
 
 1. Clone the repository
 2. Create a `.env` file:
 ```env
-INPUT_GH_TOKEN=your_github_personal_access_token
+INPUT_GH_COMMIT=your_github_personal_access_token
 ```
 
 3. Install dependencies:
@@ -81,44 +80,57 @@ pip install -r requirements.txt
 python github_stats.py <username>
 ```
 
-### Required Permissions
-
-You'll need a [GitHub Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) with:
-- `repo` scope for repository access
-- `user` scope for user data access
-
-## Usage as GitHub Action
+## GitHub Action Setup
 
 1. Create `.github/workflows/github-stats.yml`:
 ```yaml
 name: GitHub Stats Update
 on:
-schedule:
-cron: '0 0 ' # Runs daily at midnight
-workflow_dispatch: # Allows manual trigger
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight
+  workflow_dispatch:      # Allows manual trigger
+    
 jobs:
-update-stats:
-runs-on: ubuntu-latest
-steps:
-uses: VatsalSy/commits-readme-stats@v1.0.0
-with:
-GH_TOKEN: ${{ secrets.GH_TOKEN }}
-SHOW_COMMIT: true
-SHOW_DAYS_OF_WEEK: true
-COMMIT_MESSAGE: 'docs(stats): update github stats'
+  update-stats:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_COMMIT }}
+          
+      - name: Generate Stats
+        uses: VatsalSy/commits-readme-stats@v2.0.0
+        with:
+          GH_COMMIT: ${{ secrets.GH_COMMIT }}
+          SHOW_COMMIT: true
+          SHOW_DAYS_OF_WEEK: true
+          COMMIT_MESSAGE: 'docs(stats): update github stats'
 ```
 
-
-2. Add `GH_TOKEN` to your repository secrets with the required permissions.
-
-3. Add these markers to your README.md where you want the stats to appear:
-
+2. Add these markers to your README.md:
 ```markdown
 <!--START_SECTION:github-stats-->
 <!--END_SECTION:github-stats-->
 ```
 
+3. Set up GitHub Personal Access Token:
+   - Go to [GitHub Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens)
+   - Generate a token with `repo` and `user` scopes
+   - Add the token as a repository secret named `GH_COMMIT`
 
+## Configuration Options
+
+| Option | Description | Required | Default |
+|--------|-------------|----------|---------|
+| `GH_COMMIT` | GitHub Personal Access Token | Yes | N/A |
+| `SHOW_COMMIT` | Show commit timing patterns | No | `true` |
+| `SHOW_DAYS_OF_WEEK` | Show most productive days | No | `true` |
+| `COMMIT_MESSAGE` | Custom commit message | No | `'docs(stats): update github stats'` |
+| `COMMIT_BY_ME` | Whether commits should be authored by token owner | No | `false` |
+| `COMMIT_USERNAME` | Username for commit author | No | `'github-actions[bot]'` |
+| `COMMIT_EMAIL` | Email for commit author | No | `'41898282+github-actions[bot]@users.noreply.github.com'` |
 
 ## License
 
