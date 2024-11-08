@@ -116,8 +116,9 @@ class TokenManager:
             return {
                 k: TokenManager.redact_sensitive_data(v) 
                 for k, v in data.items()
-                if not any(sensitive in k.lower() 
-                          for sensitive in ['token', 'key', 'secret', 'password', 'auth'])
+                if not (isinstance(k, str) and 
+                       any(sensitive in k.lower() 
+                           for sensitive in ['token', 'key', 'secret', 'password', 'auth']))
             }
         elif isinstance(data, list):
             return [TokenManager.redact_sensitive_data(item) for item in data]

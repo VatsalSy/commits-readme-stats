@@ -171,12 +171,7 @@ class FileManager:
 
     @staticmethod
     def cache_binary(name: str, content: Any = None, assets: bool = False) -> Optional[Any]:
-        """Enhanced secure cache with better encryption and token protection
-        
-        Uses JSON serialization instead of pickle for security.
-        Pickle is deliberately avoided due to remote code execution risks.
-        Sensitive data like tokens are redacted before caching.
-        """
+        """Enhanced secure cache with better encryption and token protection"""
         try:
             # Validate filename
             if not re.match(r'^[\w\-. ]+$', name):
@@ -202,6 +197,13 @@ class FileManager:
                     from .manager_token import TokenManager
                     content = TokenManager.redact_sensitive_data(content)
                 
+                # Convert integer keys to strings for JSON serialization
+                if isinstance(content, list) and len(content) == 2:
+                    yearly_data, date_data = content
+                    if isinstance(yearly_data, dict):
+                        yearly_data = {str(k): v for k, v in yearly_data.items()}
+                    content = [yearly_data, date_data]
+                
                 # Serialize data securely
                 json_data = json.dumps(content)
                 encrypted_data = fernet.encrypt(json_data.encode())
@@ -211,13 +213,24 @@ class FileManager:
                     os.chmod(filepath, 0o600)  # Owner read/write only
                     f.write(encrypted_data)
                 return None
-            
+
             try:
                 with open(filepath, 'rb') as f:
                     encrypted_data = f.read()
                 try:
                     decrypted_data = fernet.decrypt(encrypted_data)
-                    return json.loads(decrypted_data)
+                    data = json.loads(decrypted_data)
+                    
+                    # Convert string keys back to integers for yearly_data
+                    if isinstance(data, list) and len(data) == 2:
+                        yearly_data, date_data = data
+                        if isinstance(yearly_data, dict):
+                            yearly_data = {
+                                int(k) if k.isdigit() else k: v 
+                                for k, v in yearly_data.items()
+                            }
+                            data = [yearly_data, date_data]
+                    return data
                 except InvalidToken:
                     return None
             except FileNotFoundError:

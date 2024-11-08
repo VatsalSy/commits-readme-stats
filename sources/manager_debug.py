@@ -77,6 +77,7 @@ class DebugManager:
         :param mask_token: Whether to mask sensitive tokens in the message
         :return: Sanitized error message
         """
+        from .manager_environment import EnvironmentManager as EM
         from .manager_token import TokenManager
         
         # Get base error message

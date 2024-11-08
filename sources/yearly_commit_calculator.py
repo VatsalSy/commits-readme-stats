@@ -37,16 +37,16 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     cache_filename = f"commits_{sha256(target_username.encode()).hexdigest()}.json"
     
     # Try to load cached data if it's recent enough
-    use_cache = False
     try:
         cached_data = FM.cache_binary(cache_filename, assets=True)
         if cached_data is not None:
             yearly_data, date_data = cached_data
             
-            # Validate cache structure
+            # Validate cache structure without using string operations
             if (isinstance(yearly_data, dict) and 
                 isinstance(date_data, dict) and
-                all(isinstance(k, (int, str)) for k in yearly_data.keys())):
+                all(isinstance(v, dict) for v in yearly_data.values()) and
+                all(isinstance(v, dict) for v in date_data.values())):
                 
                 DBM.i("Commit data restored from cache!")
                 return yearly_data, date_data

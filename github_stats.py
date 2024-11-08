@@ -32,9 +32,14 @@ async def run_local():
         config.debug = args.debug
         config.username = args.username
         
-        # Apply configuration to environment securely
+        # Initialize environment first with debug setting
+        from sources.manager_environment import EnvironmentManager as EM
+        EM.DEBUG_RUN = config.debug
+        
+        # Apply remaining configuration to environment securely
         for key, value in config.to_env_dict().items():
-            os.environ[key] = value
+            if key != "DEBUG_RUN":  # Skip debug since we already set it
+                os.environ[key] = value
         
         # Initialize managers
         from sources.manager_debug import DebugManager as DBM, init_debug_manager
