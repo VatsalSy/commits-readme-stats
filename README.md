@@ -35,6 +35,34 @@
    Let's analyze your commit patterns!
 </p>
 
+## Key Features
+
+🎯 **Focused Implementation**
+- Specializes in commit analytics only - clean and efficient
+- Tracks commit timing patterns and most productive days
+- Perfect for understanding your coding schedule
+
+🔄 **Smart Commit Tracking**
+- Prevents double-counting of commits across branches
+- Uses commit hash tracking for accurate statistics
+- Handles merge commits and branch synchronization intelligently
+
+📊 **Analytics Include**
+- Time of day commit patterns (Early Bird vs Night Owl)
+- Most productive days of the week
+- Clean, visual representation of commit habits
+
+## Comparison with Original
+
+| Feature | commits-readme-stats | waka-readme-stats |
+|---------|---------------------|-------------------|
+| Commit Time Analytics | ✅ | ✅ |
+| Language Statistics | ❌ | ✅ |
+| Prevent Double Counting | ✅ | ❌ |
+| WakaTime Integration | ❌ | ✅ |
+| Setup Complexity | Simple | Complex |
+| Focus | Commit Patterns | Full Coding Stats |
+
 ## Setup
 
 1. Clone the repository
