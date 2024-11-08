@@ -14,6 +14,13 @@ from .manager_debug import DebugManager as DBM
 from .manager_token import TokenManager
 
 
+def ensure_cache_dir():
+    cache_dir = os.path.join(os.getcwd(), "assets")
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, exist_ok=True)
+    return cache_dir
+
+
 async def calculate_commit_data(repositories: List[Dict], target_username: str) -> Tuple[Dict, Dict]:
     """
     Calculate commit data by years with secure caching.
@@ -23,6 +30,7 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     :param target_username: GitHub username of the authenticated user.
     :returns: Commit quarter yearly data dictionary.
     """
+    ensure_cache_dir()
     DBM.i("Calculating commit data...")
     
     # Create cache filename with username (using hash for safety)

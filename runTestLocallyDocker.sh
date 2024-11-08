@@ -9,7 +9,7 @@ trap 'rm -f "$temp_secrets"' EXIT
 
 # Create secrets file in secure temp location
 cat > "$temp_secrets" <<EOF
-GH_TOKEN=$(cat .secrets)
+GH_COMMIT_TOKEN=$(cat .secrets)
 EOF
 
 # Run act with temporary secrets file

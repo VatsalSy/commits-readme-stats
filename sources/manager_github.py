@@ -47,7 +47,7 @@ class GitHubManager:
         - Clone of the named repo.
         """
         try:
-            github = Github(EM.GH_TOKEN)
+            github = Github(EM.GH_COMMIT_TOKEN)
             clone_path = "repo"
             GitHubManager.USER = github.get_user()
             rmtree(clone_path, ignore_errors=True)
@@ -245,7 +245,7 @@ class GitHubManager:
     async def user_exists(username: str) -> bool:
         """Check if a GitHub user exists."""
         try:
-            github = Github(EM.GH_TOKEN)
+            github = Github(EM.GH_COMMIT_TOKEN)
             user = github.get_user(username)
             # Try to access a property to verify the user exists
             _ = user.login

@@ -7,7 +7,7 @@ from .manager_config import Configuration
 class EnvironmentManager(BaseEnvironmentManager):
     """Class for handling environmental variables"""
 
-    GH_TOKEN: str = None  # Will be set during initialization
+    GH_COMMIT_TOKEN: str = None  # Will be set during initialization
 
     SECTION_NAME = getenv("INPUT_SECTION_NAME", "github-stats")
     PULL_BRANCH_NAME = getenv("INPUT_PULL_BRANCH_NAME", "")
@@ -34,4 +34,4 @@ class EnvironmentManager(BaseEnvironmentManager):
     @classmethod
     def init(cls):
         """Initialize environment manager"""
-        cls.GH_TOKEN = TokenManager.get_token()
+        cls.GH_COMMIT_TOKEN = TokenManager.get_token()

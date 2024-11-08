@@ -67,7 +67,7 @@
 1. Clone the repository
 2. Create a `.env` file:
 ```env
-INPUT_GH_COMMIT=your_github_personal_access_token
+INPUT_GH_COMMIT_TOKEN=your_github_personal_access_token
 ```
 
 3. Install dependencies:
@@ -98,12 +98,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_COMMIT }}
+          token: ${{ secrets.GH_COMMIT_TOKEN }}
           
       - name: Generate Stats
         uses: VatsalSy/commits-readme-stats@v2.0.0
         with:
-          GH_COMMIT: ${{ secrets.GH_COMMIT }}
+          GH_COMMIT_TOKEN: ${{ secrets.GH_COMMIT_TOKEN }}
           SHOW_COMMIT: true
           SHOW_DAYS_OF_WEEK: true
           COMMIT_MESSAGE: 'docs(stats): update github stats'
@@ -118,13 +118,13 @@ jobs:
 3. Set up GitHub Personal Access Token:
    - Go to [GitHub Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens)
    - Generate a token with `repo` and `user` scopes
-   - Add the token as a repository secret named `GH_COMMIT`
+   - Add the token as a repository secret named `GH_COMMIT_TOKEN`
 
 ## Configuration Options
 
 | Option | Description | Required | Default |
 |--------|-------------|----------|---------|
-| `GH_COMMIT` | GitHub Personal Access Token | Yes | N/A |
+| `GH_COMMIT_TOKEN` | GitHub Personal Access Token | Yes | N/A |
 | `SHOW_COMMIT` | Show commit timing patterns | No | `true` |
 | `SHOW_DAYS_OF_WEEK` | Show most productive days | No | `true` |
 | `COMMIT_MESSAGE` | Custom commit message | No | `'docs(stats): update github stats'` |

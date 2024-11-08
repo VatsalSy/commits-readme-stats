@@ -3,7 +3,7 @@ description: 'Add commit statistics to your GitHub Profile README'
 author: 'VatsalSy'
 
 inputs:
-  GH_TOKEN:
+  GH_COMMIT_TOKEN:
     description: 'GitHub Personal Access Token'
     required: true
   SHOW_COMMIT:
@@ -42,7 +42,7 @@ runs:
         
         # Use credential helper instead of token in URL
         git config --global credential.helper store
-        echo "https://oauth2:${{ inputs.GH_TOKEN }}@github.com" > ~/.git-credentials
+        echo "https://oauth2:${{ inputs.GH_COMMIT_TOKEN }}@github.com" > ~/.git-credentials
         chmod 600 ~/.git-credentials
 
     - name: Set up Python
@@ -60,12 +60,13 @@ runs:
     - name: Run stats update
       shell: bash
       env:
-        INPUT_GH_TOKEN: ${{ inputs.GH_TOKEN }}
-        INPUT_SHOW_COMMIT: ${{ inputs.SHOW_COMMIT }}
-        INPUT_SHOW_DAYS_OF_WEEK: ${{ inputs.SHOW_DAYS_OF_WEEK }}
-        INPUT_COMMIT_MESSAGE: ${{ inputs.COMMIT_MESSAGE }}
-        INPUT_COMMIT_BY_ME: ${{ inputs.COMMIT_BY_ME }}
-        INPUT_COMMIT_USERNAME: ${{ inputs.COMMIT_USERNAME }}
-        INPUT_COMMIT_EMAIL: ${{ inputs.COMMIT_EMAIL }}
-        GITHUB_TOKEN: ${{ inputs.GH_TOKEN }}
+        INPUT_GH_COMMIT_TOKEN: ${{ inputs.GH_COMMIT_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.GH_COMMIT_TOKEN }}
+        DEBUG_RUN: 'false'
+        SHOW_COMMIT: ${{ inputs.SHOW_COMMIT }}
+        SHOW_DAYS_OF_WEEK: ${{ inputs.SHOW_DAYS_OF_WEEK }}
+        COMMIT_MESSAGE: ${{ inputs.COMMIT_MESSAGE }}
+        COMMIT_BY_ME: ${{ inputs.COMMIT_BY_ME }}
+        COMMIT_USERNAME: ${{ inputs.COMMIT_USERNAME }}
+        COMMIT_EMAIL: ${{ inputs.COMMIT_EMAIL }}
       run: python -m sources.main

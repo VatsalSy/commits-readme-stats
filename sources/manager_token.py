@@ -26,14 +26,14 @@ class TokenManager:
     def _load_token(cls) -> str:
         """Load token from environment or prompt securely"""
         # Try loading from environment
-        token = os.getenv('INPUT_GH_TOKEN')
+        token = os.getenv('INPUT_GH_COMMIT_TOKEN')
         
         if not token:
             try:
                 # Try loading from .env file if python-dotenv is available
                 from dotenv import load_dotenv
                 load_dotenv()
-                token = os.getenv('INPUT_GH_TOKEN')
+                token = os.getenv('INPUT_GH_COMMIT_TOKEN')
             except ImportError:
                 pass
         
@@ -49,7 +49,7 @@ class TokenManager:
                 raise ValueError("Failed to get GitHub token: Interactive input failed") from e
                 
         if not token:
-            raise ValueError("GitHub token is required. Please set INPUT_GH_TOKEN environment variable or create a .env file")
+            raise ValueError("GitHub token is required. Please set INPUT_GH_COMMIT_TOKEN environment variable or create a .env file")
             
         # Validate token format
         if not cls._validate_token(token):

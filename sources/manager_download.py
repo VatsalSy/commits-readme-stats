@@ -85,16 +85,16 @@ class DownloadManager:
     _REMOTE_RESOURCES: List[Task] = []
     target_username: str = None
 
-    @staticmethod
-    async def init(username: str):
-        """Initialize the download manager with GitHub API client."""
-        DBM.i("Initializing download manager...")
-        DownloadManager.target_username = username
-        DownloadManager._CLIENT = AsyncClient(
-            headers={
-                "Authorization": f"Bearer {EM.GH_TOKEN}",
-                "Content-Type": "application/json",
-            }
+    @classmethod
+    async def init(cls, username: str):
+        """Initialize download manager with headers"""
+        cls.target_username = username
+        cls.headers = {
+            "Authorization": f"Bearer {EM.GH_COMMIT_TOKEN}",
+            "Content-Type": "application/json",
+        }
+        cls._CLIENT = AsyncClient(
+            headers=cls.headers
         )
         DBM.g("Download manager initialized!")
 
