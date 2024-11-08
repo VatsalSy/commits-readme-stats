@@ -74,6 +74,6 @@ runs:
         cd ${{ github.action_path }}
         python -m sources.main
 
-  branding:
-    icon: 'check-circle'
-    color: 'blue'
+branding:
+  icon: 'check-circle'
+  color: 'blue'
