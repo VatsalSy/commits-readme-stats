@@ -9,12 +9,15 @@ import argparse
 
 from sources.manager_debug import DebugManager as DBM
 
+# Initialize debug logger first
+DBM.create_logger()
+
 async def run_local():
     """Run the stats generator locally"""
     try:
         print("Starting local GitHub stats generation...")
         
-        # Load environment variables
+        # Load environment variables securely
         load_dotenv()
         
         # Parse command line arguments
@@ -23,9 +26,15 @@ async def run_local():
         parser.add_argument('--debug', action='store_true', help='Run in debug mode')
         args = parser.parse_args()
         
-        # Set debug environment variable based on flag
-        os.environ["DEBUG_RUN"] = str(args.debug)
-        os.environ["INPUT_USERNAME"] = args.username
+        # Use Configuration class for secure settings management
+        from sources.manager_config import Configuration
+        config = Configuration()
+        config.debug = args.debug
+        config.username = args.username
+        
+        # Apply configuration to environment securely
+        for key, value in config.to_env_dict().items():
+            os.environ[key] = value
         
         # Initialize managers
         from sources.manager_debug import DebugManager as DBM, init_debug_manager

@@ -3,10 +3,22 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  update-stats:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: ./
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          
+      - name: Generate Stats
+        uses: ./
         with:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          SHOW_COMMIT: true
+          SHOW_DAYS_OF_WEEK: true
+          COMMIT_MESSAGE: 'docs(stats): update github stats'
+          COMMIT_BY_ME: false
+          COMMIT_USERNAME: 'github-actions[bot]'
+          COMMIT_EMAIL: '41898282+github-actions[bot]@users.noreply.github.com'

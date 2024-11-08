@@ -54,11 +54,17 @@ async def main():
     init_debug_manager()
     DBM.i("Debug manager initialized.")
     
+    # Initialize environment manager
+    EM.init()
+    DBM.i("Environment manager initialized.")
+    
     # Then initialize other managers
     init_github_manager()
     DBM.i("GitHub manager initialized.")
     
-    await DM.init(GHM.USER.login)
+    # Initialize with username from environment or GitHub Action input
+    username = EM.USERNAME or GHM.USER.login
+    await DM.init(username)
     DBM.i("Download manager initialized.")
     
     init_localization_manager()
@@ -69,7 +75,11 @@ async def main():
         GHM.update_readme(stats)
         GHM.commit_update()
     else:
-        GHM.set_github_output(stats)
+        DBM.i("\nGenerated Statistics:")
+        DBM.i("=" * 50)
+        print(stats)
+        DBM.i("=" * 50)
+        
     await DM.close_remote_resources()
 
 

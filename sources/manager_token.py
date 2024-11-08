@@ -1,5 +1,5 @@
 import os
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 import hashlib
 import math
 
@@ -101,3 +101,30 @@ class TokenManager:
             'GIT_USERNAME': 'oauth2',
             'GIT_PASSWORD': token
         }
+    
+    @staticmethod
+    def redact_sensitive_data(data: Any) -> Any:
+        """Recursively redact sensitive data from dictionaries and lists
+        
+        Args:
+            data: The data structure to redact
+            
+        Returns:
+            Copy of data with sensitive values redacted
+        """
+        if isinstance(data, dict):
+            return {
+                k: TokenManager.redact_sensitive_data(v) 
+                for k, v in data.items()
+                if not any(sensitive in k.lower() 
+                          for sensitive in ['token', 'key', 'secret', 'password', 'auth'])
+            }
+        elif isinstance(data, list):
+            return [TokenManager.redact_sensitive_data(item) for item in data]
+        elif isinstance(data, str):
+            # Check if string looks like a token/key
+            if any(data.startswith(prefix) for prefix in ['ghp_', 'github_pat_']):
+                return '[REDACTED]'
+            return data
+        else:
+            return data
