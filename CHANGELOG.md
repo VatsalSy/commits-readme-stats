@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.3] - 2024-11-17
+
+### Added
+- Option to show total number of commits. 
+- Addressed some inconsistencies in the code local setup.
+
 ## [2.0.0] - 2024-11-07
 
 ### Added

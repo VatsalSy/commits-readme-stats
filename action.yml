@@ -61,7 +61,6 @@ runs:
       shell: bash
       env:
         INPUT_GH_COMMIT_TOKEN: ${{ inputs.GH_COMMIT_TOKEN }}
-        GITHUB_TOKEN: ${{ inputs.GH_COMMIT_TOKEN }}
         DEBUG_RUN: 'false'
         SHOW_COMMIT: ${{ inputs.SHOW_COMMIT }}
         SHOW_DAYS_OF_WEEK: ${{ inputs.SHOW_DAYS_OF_WEEK }}
