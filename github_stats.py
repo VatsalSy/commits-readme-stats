@@ -66,13 +66,14 @@ async def run_local():
         from sources.manager_token import TokenManager
         token = TokenManager.get_token()  # This will use INPUT_GH_COMMIT_TOKEN
         
+        allowPush = True
         if token:
-            # print(f"Debug: Found GitHub token")
             token_username = get_token_user(token)
             print(f"Debug: Token username: {token_username}")
             if token_username and token_username.lower() != args.username.lower():
                 print(f"\nWARNING: The provided username '{args.username}' does not match the token owner '{token_username}'")
                 print("This may result in incorrect statistics being generated!\n")
+                allowPush = False
         else:
             print("Debug: No GitHub token found")
         
@@ -116,13 +117,16 @@ async def run_local():
         # If not in debug mode, commit and push changes
         if not EM.DEBUG_RUN:
             try:
-                # Update README with stats
-                GHM.update_readme(stats)
-                # Commit and push changes
-                GHM.commit_update()
-                DBM.i("Changes committed and pushed")
+                if allowPush:   
+                    # Update README with stats
+                    GHM.update_readme(stats)
+                    # Commit and push changes
+                    GHM.commit_update()
+                    print("Changes committed and pushed")
+                else:
+                    print("Skipping commit and push as username mismatch")
             except Exception as e:
-                DBM.p(f"Error updating repository: {str(e)}")
+                print(f"Error updating repository: {str(e)}")
                 raise
         else:
             DBM.i("\nGenerated Statistics:")
