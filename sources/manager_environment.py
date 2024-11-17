@@ -15,6 +15,7 @@ class EnvironmentManager(BaseEnvironmentManager):
 
     SHOW_COMMIT = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_COMMIT", "True"))
     SHOW_DAYS_OF_WEEK = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_DAYS_OF_WEEK", "True"))
+    SHOW_TOTAL_COMMITS = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_TOTAL_COMMITS", "True"))
 
     COMMIT_BY_ME = BaseEnvironmentManager.is_truthy(getenv("INPUT_COMMIT_BY_ME", "False"))
     COMMIT_MESSAGE = getenv("INPUT_COMMIT_MESSAGE", "Updated with Dev Metrics")

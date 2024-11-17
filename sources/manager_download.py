@@ -20,8 +20,7 @@ query($username: String!, $after: String) {
             first: 100,
             after: $after,
             orderBy: {field: CREATED_AT, direction: DESC},
-            ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR],
-            isFork: false
+            ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR]
         ) {
             nodes {
                 primaryLanguage {

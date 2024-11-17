@@ -127,6 +127,7 @@ jobs:
 | `GH_COMMIT_TOKEN` | GitHub Personal Access Token | Yes | N/A |
 | `SHOW_COMMIT` | Show commit timing patterns | No | `true` |
 | `SHOW_DAYS_OF_WEEK` | Show most productive days | No | `true` |
+| `SHOW_TOTAL_COMMITS` | Show total number of commits | No | `true` |
 | `COMMIT_MESSAGE` | Custom commit message | No | `'docs(stats): update github stats'` |
 | `COMMIT_BY_ME` | Whether commits should be authored by token owner | No | `false` |
 | `COMMIT_USERNAME` | Username for commit author | No | `'github-actions[bot]'` |
