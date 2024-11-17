@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.0.3] - 2024-11-17
+## [2.5.0] - 2024-11-17
 
 ### Added
 - Option to show total number of commits. 

@@ -89,9 +89,9 @@ python github_stats.py <username>
 name: GitHub Stats Update
 on:
   schedule:
-    - cron: '0 0 * * *'  # Runs daily at midnight
+    - cron: '0 */4 * * *'  # Runs every 4 hours
   workflow_dispatch:      # Allows manual trigger
-    
+
 jobs:
   update-stats:
     runs-on: ubuntu-latest
@@ -103,12 +103,16 @@ jobs:
           token: ${{ secrets.GH_COMMIT_TOKEN }}
           
       - name: Generate Stats
-        uses: VatsalSy/commits-readme-stats@v2.0.3
+        uses: VatsalSy/commits-readme-stats@v2.5
         with:
           GH_COMMIT_TOKEN: ${{ secrets.GH_COMMIT_TOKEN }}
           SHOW_COMMIT: true
           SHOW_DAYS_OF_WEEK: true
           COMMIT_MESSAGE: 'docs(stats): update github stats'
+          COMMIT_BY_ME: false
+          COMMIT_USERNAME: 'github-actions[bot]'
+          COMMIT_EMAIL: '41898282+github-actions[bot]@users.noreply.github.com'
+
 ```
 
 2. Add these markers to your README.md:
