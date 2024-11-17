@@ -80,6 +80,16 @@ pip install -r requirements.txt
 python github_stats.py <username>
 ```
 
+## Local Testing
+
+1. Copy `workflow_dispatch.json.example` to `workflow_dispatch.json`
+2. Update the values in your local `workflow_dispatch.json` as needed
+3. Run the test script:
+
+```bash
+bash runTestLocallyDocker.sh
+```
+
 ## GitHub Action Setup
 
 **Note:** The token names for GitHub Actions are different from the local setup.

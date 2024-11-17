@@ -3,6 +3,7 @@ GitHub Commit Statistics Generator
 """
 from asyncio import run
 from datetime import datetime
+import os
 
 from sources.manager_download import DownloadManager as DM
 from sources.manager_environment import EnvironmentManager as EM
@@ -11,7 +12,8 @@ from sources.manager_file import init_localization_manager, FileManager as FM
 from sources.manager_debug import init_debug_manager, DebugManager as DBM
 from sources.yearly_commit_calculator import calculate_commit_data
 from sources.graphics_list_formatter import make_commit_day_time_list
-
+from sources.manager_token import get_token_user, TokenManager
+import sys
 
 async def collect_user_repositories(username: str):
     """
@@ -69,6 +71,20 @@ async def main():
     
     init_localization_manager()
     DBM.i("Localization manager initialized.")
+
+    # Get the repository owner from GitHub context
+    repo_owner = os.getenv('GITHUB_REPOSITORY_OWNER')
+    
+    # Get token owner
+    token_username = get_token_user(TokenManager.get_token())
+    
+    if repo_owner and token_username and repo_owner.lower() != token_username.lower():
+        print(f"Error: Username mismatch - Cannot proceed with repository updates in non-debug mode")
+        print(f"Please either:")
+        print(f"1. Use the token owner's username")
+        print(f"2. Run in debug mode with --debug flag")
+        print(f"3. Use a token that belongs to the specified username")
+        sys.exit(1)
 
     stats = await get_stats()
     if not EM.DEBUG_RUN:

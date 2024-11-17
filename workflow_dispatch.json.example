@@ -1,0 +1,11 @@
+{
+  "inputs": {
+    "GH_COMMIT_TOKEN": "",
+    "SHOW_COMMIT": "true",
+    "SHOW_DAYS_OF_WEEK": "true",
+    "COMMIT_MESSAGE": "docs(stats): update github stats",
+    "COMMIT_BY_ME": "false",
+    "COMMIT_USERNAME": "github-actions[bot]",
+    "COMMIT_EMAIL": "41898282+github-actions[bot]@users.noreply.github.com"
+  }
+}

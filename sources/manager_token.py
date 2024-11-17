@@ -2,6 +2,8 @@ import os
 from typing import Optional, Dict, Any
 import hashlib
 import math
+import requests
+from .manager_debug import DebugManager as DBM
 
 class TokenManager:
     """Enhanced secure token management"""
@@ -129,3 +131,32 @@ class TokenManager:
             return data
         else:
             return data
+
+def get_token_user(token):
+    """Get the username of the token owner"""
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.github.v4.idl'
+    }
+    query = """
+    query { 
+        viewer { 
+            login
+        }
+    }
+    """
+    try:
+        response = requests.post('https://api.github.com/graphql', json={'query': query}, headers=headers)
+        DBM.i(f"API Response status code: {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            if 'data' in data and 'viewer' in data['data'] and 'login' in data['data']['viewer']:
+                return data['data']['viewer']['login']
+            else:
+                DBM.w(f"Unexpected response structure: {data}")
+        else:
+            DBM.w(f"API request failed with status {response.status_code}")
+            DBM.w(f"Response content: {response.text}")
+    except Exception as e:
+        DBM.w(f"Error in get_token_user: {str(e)}")
+    return None

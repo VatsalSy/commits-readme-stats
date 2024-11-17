@@ -9,38 +9,10 @@ import argparse
 import requests
 
 from sources.manager_debug import DebugManager as DBM
+from sources.manager_token import get_token_user
 
 # Initialize debug logger first
 DBM.create_logger()
-
-def get_token_user(token):
-    """Get the username of the token owner"""
-    headers = {
-        'Authorization': f'Bearer {token}',
-        'Accept': 'application/vnd.github.v4.idl'
-    }
-    query = """
-    query { 
-        viewer { 
-            login
-        }
-    }
-    """
-    try:
-        response = requests.post('https://api.github.com/graphql', json={'query': query}, headers=headers)
-        print(f"Debug: API Response status code: {response.status_code}")
-        if response.status_code == 200:
-            data = response.json()
-            if 'data' in data and 'viewer' in data['data'] and 'login' in data['data']['viewer']:
-                return data['data']['viewer']['login']
-            else:
-                print(f"Debug: Unexpected response structure: {data}")
-        else:
-            print(f"Debug: API request failed with status {response.status_code}")
-            print(f"Debug: Response content: {response.text}")
-    except Exception as e:
-        print(f"Debug: Error in get_token_user: {str(e)}")
-    return None
 
 async def run_local():
     """Run the stats generator locally"""

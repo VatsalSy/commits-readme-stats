@@ -18,6 +18,7 @@ act workflow_dispatch \
   --eventpath workflow_dispatch.json \
   --bind \
   -P ubuntu-latest=catthehacker/ubuntu:act-latest \
+  --container-architecture linux/amd64 \
   --container-daemon-socket /var/run/docker.sock \
   --secret-file "$temp_secrets" \
   --env-file .env
