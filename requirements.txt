@@ -4,7 +4,7 @@ GitPython==3.1.43
 
 # Request making and response parsing modules:
 httpx==0.27.2
-humanize==4.12.2
+humanize==4.12.3
 
 # Environment variables
 python-dotenv==1.1.0
