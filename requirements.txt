@@ -1,5 +1,5 @@
 # GitHub integration modules:
-PyGithub==2.6.1
+PyGithub==2.8.1
 GitPython==3.1.43
 
 # Request making and response parsing modules:
