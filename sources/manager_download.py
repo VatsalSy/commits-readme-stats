@@ -4,7 +4,7 @@ from json import dumps
 from string import Template
 from typing import Dict, List
 import os
-from time import sleep
+from asyncio import sleep
 
 from httpx import AsyncClient
 
@@ -170,7 +170,7 @@ class DownloadManager:
         has_next_page = True
         end_cursor = None
         retry_count = 0
-        max_retries = 3
+        max_retries = 5
         
         while has_next_page and retry_count < max_retries:
             try:
@@ -196,7 +196,16 @@ class DownloadManager:
                     await sleep(retry_after)
                     retry_count += 1
                     continue
-                    
+
+                # Handle transient server errors with exponential backoff
+                if response.status_code in (502, 503, 504):
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        wait_time = min(2 ** retry_count, 32)  # 2s, 4s, 8s, 16s, 32s
+                        DBM.w(f"Server error {response.status_code}, retry {retry_count}/{max_retries} in {wait_time}s")
+                        await sleep(wait_time)
+                        continue
+
                 if response.status_code != 200:
                     # Mask sensitive information before logging or raising
                     status_code = response.status_code
