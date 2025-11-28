@@ -113,7 +113,7 @@ jobs:
           token: ${{ secrets.GH_COMMIT_TOKEN }}
           
       - name: Generate Stats
-        uses: VatsalSy/commits-readme-stats@v2.5
+        uses: VatsalSy/commits-readme-stats@v3.0
         with:
           GH_COMMIT_TOKEN: ${{ secrets.GH_COMMIT_TOKEN }}
           SHOW_COMMIT: true

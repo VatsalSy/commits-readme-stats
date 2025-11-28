@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.0] - 2025-11-29
+
+### Improved
+- Add exponential backoff retry for transient server errors (502, 503, 504)
+- Increase max retries from 3 to 5 for better resilience
+- Switch to asyncio.sleep for proper async context usage
+
 ## [2.5.0] - 2024-11-17
 
 ### Added
