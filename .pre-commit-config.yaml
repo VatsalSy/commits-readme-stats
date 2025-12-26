@@ -1,6 +1,6 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
     -   id: detect-private-key
     -   id: check-yaml
@@ -12,7 +12,7 @@ repos:
     -   id: end-of-file-fixer
 
 -   repo: https://github.com/PyCQA/bandit
-    rev: 1.7.7
+    rev: 1.9.2
     hooks:
     -   id: bandit
         args: ["-ll", "-ii", "-s", "B324"]
