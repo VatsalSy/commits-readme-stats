@@ -112,44 +112,56 @@ class GitHubManager:
         GitHubManager.REPO.git.add(dst_path)
 
     @staticmethod
-    def update_readme(stats: str) -> None:
+    def update_readme(stats: str, section_name: str = None) -> None:
         """
         Updates README.md content between section markers with new stats.
+
+        Args:
+            stats: The formatted statistics string to insert.
+            section_name: Optional section name for markers. Defaults to EM.SECTION_NAME.
+                         Use "wakatime" for WakaTime stats section.
         """
         readme_path = "repo/README.md"
-        
+
+        # Use provided section name or default
+        section = section_name if section_name else EM.SECTION_NAME
+
         try:
             # Read current README content
             with open(readme_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            
-            # Replace content between markers
-            start_marker = GitHubManager._START_COMMENT
-            end_marker = GitHubManager._END_COMMENT
-            
+
+            # Build markers for the specified section
+            start_marker = f"<!--START_SECTION:{section}-->"
+            end_marker = f"<!--END_SECTION:{section}-->"
+            section_regex = f"{start_marker}[\\s\\S]+{end_marker}"
+
             # Create new content with stats
             new_content = f"{start_marker}\n{stats}{end_marker}"
-            
+
             # Replace old section with new content
             import re
-            if re.search(GitHubManager._README_REGEX, content):
+            if re.search(section_regex, content):
                 updated_content = re.sub(
-                    GitHubManager._README_REGEX,
+                    section_regex,
                     new_content,
                     content
                 )
+                DBM.g(f"README.md section '{section}' updated successfully!")
             else:
-                # If markers don't exist, append to end
-                updated_content = f"{content}\n{new_content}"
-                
+                # If markers don't exist, don't append - just log a warning
+                DBM.w(f"Section markers for '{section}' not found in README.md. Skipping update.")
+                DBM.i(f"Add these markers to your README.md to enable this section:")
+                DBM.i(f"  {start_marker}")
+                DBM.i(f"  {end_marker}")
+                return
+
             # Write updated content back to README
             with open(readme_path, "w", encoding="utf-8") as f:
                 f.write(updated_content)
-                
-            DBM.g("README.md updated successfully!")
-            
+
         except Exception as e:
-            DBM.p(f"Error updating README: {str(e)}")
+            DBM.p(f"Error updating README section '{section}': {str(e)}")
 
     @staticmethod
     def update_chart(name: str, path: str) -> str:
