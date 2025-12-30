@@ -37,7 +37,7 @@
 ## Key Features
 
 🎯 **Focused Implementation**
-- Specializes in commit analytics only - clean and efficient
+- Specializes in commit analytics with optional WakaTime integration
 - Tracks commit timing patterns and most productive days
 - Perfect for understanding your coding schedule
 
@@ -51,16 +51,21 @@
 - Most productive days of the week
 - Clean, visual representation of commit habits
 
+⏱️ **WakaTime Integration** (Optional)
+- Programming languages breakdown
+- Editors/IDEs usage
+- Projects time distribution
+- Operating system stats
+
 ## Comparison with Original
 
 | Feature | commits-readme-stats | waka-readme-stats |
 |---------|---------------------|-------------------|
 | Commit Time Analytics | ✅ | ✅ |
-| Language Statistics | ❌ | ✅ |
+| WakaTime Integration | ✅ (opt-in) | ✅ (required) |
 | Prevent Double Counting | ✅ | ❌ |
-| WakaTime Integration | ❌ | ✅ |
 | Setup Complexity | Simple | Complex |
-| Focus | Commit Patterns | Full Coding Stats |
+| Focus | Commit + WakaTime | Full Coding Stats |
 
 ## Local Setup
 
@@ -68,6 +73,10 @@
 2. Create a `.env` file:
 ```env
 INPUT_GH_COMMIT_TOKEN=your_github_personal_access_token
+
+# Optional: WakaTime integration
+INPUT_WAKATIME_API_KEY=your_wakatime_api_key
+INPUT_SHOW_WAKATIME=True
 ```
 
 3. Install dependencies:
@@ -111,13 +120,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GH_COMMIT_TOKEN }}
-          
+
       - name: Generate Stats
         uses: VatsalSy/commits-readme-stats@v3.0
         with:
           GH_COMMIT_TOKEN: ${{ secrets.GH_COMMIT_TOKEN }}
           SHOW_COMMIT: true
           SHOW_DAYS_OF_WEEK: true
+          # WakaTime (optional - uncomment to enable)
+          # WAKATIME_API_KEY: ${{ secrets.WAKATIME_API_KEY }}
+          # SHOW_WAKATIME: true
           COMMIT_MESSAGE: 'docs(stats): update github stats'
           COMMIT_BY_ME: false
           COMMIT_USERNAME: 'github-actions[bot]'
@@ -131,12 +143,20 @@ jobs:
 <!--END_SECTION:github-stats-->
 ```
 
-3. Set up GitHub Personal Access Token:
+3. (Optional) For WakaTime stats, add this separate section:
+```markdown
+<!--START_SECTION:wakatime-->
+<!--END_SECTION:wakatime-->
+```
+
+4. Set up GitHub Personal Access Token:
    - Go to [GitHub Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens)
    - Generate a token with `repo` and `user` scopes
    - Add the token as a repository secret named `GH_COMMIT_TOKEN`
 
 ## Configuration Options
+
+### Core Options
 
 | Option | Description | Required | Default |
 |--------|-------------|----------|---------|
@@ -148,6 +168,20 @@ jobs:
 | `COMMIT_BY_ME` | Whether commits should be authored by token owner | No | `false` |
 | `COMMIT_USERNAME` | Username for commit author | No | `'github-actions[bot]'` |
 | `COMMIT_EMAIL` | Email for commit author | No | `'41898282+github-actions[bot]@users.noreply.github.com'` |
+
+### WakaTime Options (Optional)
+
+| Option | Description | Required | Default |
+|--------|-------------|----------|---------|
+| `WAKATIME_API_KEY` | WakaTime API key for coding activity stats | No | `''` |
+| `SHOW_WAKATIME` | Enable WakaTime stats (requires API key) | No | `false` |
+| `SHOW_LANGUAGE` | Show programming languages from WakaTime | No | `true` |
+| `SHOW_EDITORS` | Show editors from WakaTime | No | `true` |
+| `SHOW_PROJECTS` | Show projects from WakaTime | No | `true` |
+| `SHOW_OS` | Show operating systems from WakaTime | No | `true` |
+
+> **Note:** WakaTime integration requires both `WAKATIME_API_KEY` and `SHOW_WAKATIME: true` to be set.
+> Get your WakaTime API key from [WakaTime Settings](https://wakatime.com/settings/api-key).
 
 ## Authentication and Usage
 
