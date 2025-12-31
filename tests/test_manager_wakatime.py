@@ -17,6 +17,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sources.manager_wakatime import WakaTimeManager, WAKATIME_ENDPOINTS
 
 
+@pytest.fixture(autouse=True)
+def reset_wakatime_client():
+    """Ensure WakaTimeManager client state is reset for every test."""
+    WakaTimeManager._CLIENT = None
+    yield
+    WakaTimeManager._CLIENT = None
+
+
 class TestWakaTimeManagerConfiguration:
     """Test suite for WakaTimeManager configuration methods."""
 
@@ -305,9 +313,6 @@ class TestWakaTimeManagerClientManagement:
     @pytest.mark.asyncio
     async def test_init_creates_client(self):
         """Should create AsyncClient on init."""
-        # Reset client state
-        WakaTimeManager._CLIENT = None
-
         with patch("sources.manager_wakatime.AsyncClient") as mock_client_class, \
              patch("sources.manager_wakatime.DBM"):
             mock_client = MagicMock()
@@ -317,9 +322,6 @@ class TestWakaTimeManagerClientManagement:
 
             mock_client_class.assert_called_once_with(timeout=30.0)
             assert WakaTimeManager._CLIENT == mock_client
-
-        # Cleanup
-        WakaTimeManager._CLIENT = None
 
     @pytest.mark.asyncio
     async def test_init_does_not_recreate_client(self):
@@ -332,9 +334,6 @@ class TestWakaTimeManagerClientManagement:
 
             mock_client_class.assert_not_called()
             assert WakaTimeManager._CLIENT == existing_client
-
-        # Cleanup
-        WakaTimeManager._CLIENT = None
 
     @pytest.mark.asyncio
     async def test_close_closes_client(self):
@@ -350,8 +349,6 @@ class TestWakaTimeManagerClientManagement:
     @pytest.mark.asyncio
     async def test_close_handles_no_client(self):
         """Should handle close when no client exists."""
-        WakaTimeManager._CLIENT = None
-
         # Should not raise
         await WakaTimeManager.close()
 
