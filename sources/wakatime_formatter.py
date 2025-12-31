@@ -20,6 +20,54 @@ WAKATIME_SECTIONS = {
 }
 
 
+def _filter_and_renormalize_other(data: List[Dict]) -> List[Dict]:
+    """
+    Filter out "Other" entries and renormalize percentages.
+
+    Removes all entries where name.lower() == "other" and recalculates
+    percentages so remaining entries sum to 100%.
+
+    Args:
+        data: List of WakaTime data items with name and percent keys
+
+    Returns:
+        Filtered and renormalized list of data items
+
+    Edge cases handled:
+        - Empty list: returns empty list
+        - All "Other" entries: returns empty list
+        - No "Other" entries: returns original data with adjusted decimals
+        - Zero sum: returns empty list (defensive programming)
+    """
+    if not data:
+        return []
+
+    # Filter out "Other" entries (case-insensitive)
+    filtered_data = [
+        item for item in data
+        if item.get("name", "").lower() != "other"
+    ]
+
+    # If no items remain, return empty list
+    if not filtered_data:
+        return []
+
+    # Calculate sum of remaining percentages
+    percent_sum = sum(item.get("percent", 0.0) for item in filtered_data)
+
+    # Handle edge case: zero sum (defensive programming)
+    if percent_sum <= 0:
+        return []
+
+    # Renormalize percentages to sum to 100%
+    for item in filtered_data:
+        old_percent = item.get("percent", 0.0)
+        new_percent = (old_percent / percent_sum) * 100.0
+        item["percent"] = round(new_percent, 2)
+
+    return filtered_data
+
+
 def _format_section(
     title: str,
     data: List[Dict],
@@ -78,7 +126,7 @@ def format_wakatime_stats(
 
     # Programming Languages
     if show_flags.get("show_language", True):
-        languages = data.get("languages", [])
+        languages = _filter_and_renormalize_other(data.get("languages", []))
         if languages:
             stats += _format_section(
                 WAKATIME_SECTIONS["languages"],
@@ -88,7 +136,7 @@ def format_wakatime_stats(
 
     # Editors
     if show_flags.get("show_editors", True):
-        editors = data.get("editors", [])
+        editors = _filter_and_renormalize_other(data.get("editors", []))
         if editors:
             stats += _format_section(
                 WAKATIME_SECTIONS["editors"],
@@ -98,7 +146,7 @@ def format_wakatime_stats(
 
     # Projects
     if show_flags.get("show_projects", True):
-        projects = data.get("projects", [])
+        projects = _filter_and_renormalize_other(data.get("projects", []))
         if projects:
             stats += _format_section(
                 WAKATIME_SECTIONS["projects"],
@@ -108,7 +156,7 @@ def format_wakatime_stats(
 
     # Operating System
     if show_flags.get("show_os", True):
-        operating_systems = data.get("operating_systems", [])
+        operating_systems = _filter_and_renormalize_other(data.get("operating_systems", []))
         if operating_systems:
             stats += _format_section(
                 WAKATIME_SECTIONS["operating_systems"],
