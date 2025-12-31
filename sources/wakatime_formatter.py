@@ -5,10 +5,7 @@ This module provides formatting functions to convert WakaTime API data
 into markdown-formatted text with progress bars for GitHub profile READMEs.
 """
 
-from typing import Dict, List, Optional
-
 from .graphics_list_formatter import make_list
-from .manager_file import FileManager as FM
 
 
 # Section labels for WakaTime stats
@@ -20,7 +17,7 @@ WAKATIME_SECTIONS = {
 }
 
 
-def _filter_and_renormalize_other(data: List[Dict]) -> List[Dict]:
+def _filter_and_renormalize_other(data: list[dict]) -> list[dict]:
     """
     Filter out "Other" entries and renormalize percentages.
 
@@ -43,8 +40,9 @@ def _filter_and_renormalize_other(data: List[Dict]) -> List[Dict]:
         return []
 
     # Filter out "Other" entries (case-insensitive)
+    # Use .copy() to avoid mutating original data
     filtered_data = [
-        item for item in data
+        item.copy() for item in data
         if item.get("name", "").lower() != "other"
     ]
 
@@ -70,7 +68,7 @@ def _filter_and_renormalize_other(data: List[Dict]) -> List[Dict]:
 
 def _format_section(
     title: str,
-    data: List[Dict],
+    data: list[dict],
     top_num: int = 5
 ) -> str:
     """
@@ -106,8 +104,8 @@ def _format_section(
 
 
 def format_wakatime_stats(
-    data: Dict,
-    show_flags: Dict[str, bool]
+    data: dict,
+    show_flags: dict[str, bool]
 ) -> str:
     """
     Format WakaTime statistics into markdown.
@@ -163,6 +161,11 @@ def format_wakatime_stats(
                 operating_systems,
                 top_num=5
             )
+
+    # Check if any sections were added (stats only has header if empty)
+    header_only = "**This Week I Spent My Time On** \n\n```text\n"
+    if stats == header_only:
+        return format_no_activity()
 
     stats += "```\n"
 

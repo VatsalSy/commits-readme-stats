@@ -5,8 +5,10 @@ This module provides functionality to fetch and process WakaTime statistics
 for displaying coding activity in GitHub profile READMEs.
 """
 
-from typing import Dict, Optional
-from httpx import AsyncClient
+from base64 import b64encode
+from json import JSONDecodeError
+
+from httpx import AsyncClient, RequestError
 
 from .manager_environment import EnvironmentManager as EM
 from .manager_debug import DebugManager as DBM
@@ -22,7 +24,7 @@ WAKATIME_ENDPOINTS = {
 class WakaTimeManager:
     """Manager class for WakaTime API interactions."""
 
-    _CLIENT: AsyncClient = None
+    _CLIENT: AsyncClient | None = None
 
     @classmethod
     def is_configured(cls) -> bool:
@@ -35,7 +37,7 @@ class WakaTimeManager:
         return bool(EM.WAKATIME_API_KEY) and EM.SHOW_WAKATIME
 
     @classmethod
-    def get_api_key(cls) -> Optional[str]:
+    def get_api_key(cls) -> str | None:
         """
         Get the WakaTime API key from environment.
 
@@ -45,21 +47,21 @@ class WakaTimeManager:
         return EM.WAKATIME_API_KEY if EM.WAKATIME_API_KEY else None
 
     @classmethod
-    async def init(cls):
+    async def init(cls) -> None:
         """Initialize the WakaTime HTTP client."""
         if cls._CLIENT is None:
             cls._CLIENT = AsyncClient(timeout=30.0)
             DBM.g("WakaTime manager initialized!")
 
     @classmethod
-    async def close(cls):
+    async def close(cls) -> None:
         """Close the WakaTime HTTP client."""
         if cls._CLIENT:
             await cls._CLIENT.aclose()
             cls._CLIENT = None
 
     @classmethod
-    async def fetch_stats(cls) -> Optional[Dict]:
+    async def fetch_stats(cls) -> dict | None:
         """
         Fetch WakaTime statistics for the last 7 days.
 
@@ -81,9 +83,10 @@ class WakaTimeManager:
             url = WAKATIME_ENDPOINTS["stats_last_7_days"]
             DBM.i("Fetching WakaTime stats...")
 
+            auth_token = b64encode(f"{api_key}:".encode()).decode()
             response = await cls._CLIENT.get(
                 url,
-                params={"api_key": api_key}
+                headers={"Authorization": f"Basic {auth_token}"},
             )
 
             if response.status_code == 401:
@@ -107,12 +110,12 @@ class WakaTimeManager:
             DBM.g("WakaTime stats fetched successfully!")
             return data["data"]
 
-        except Exception as e:
-            DBM.w(f"Failed to fetch WakaTime stats: {str(e)}")
+        except (RequestError, JSONDecodeError) as e:
+            DBM.w(f"Failed to fetch WakaTime stats: {e!r}")
             return None
 
     @classmethod
-    def get_show_flags(cls) -> Dict[str, bool]:
+    def get_show_flags(cls) -> dict[str, bool]:
         """
         Get the current WakaTime display flags.
 
