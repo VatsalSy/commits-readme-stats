@@ -70,7 +70,9 @@
 ## Local Setup
 
 1. Clone the repository
+
 2. Create a `.env` file:
+
 ```env
 INPUT_GH_COMMIT_TOKEN=your_github_personal_access_token
 
@@ -80,11 +82,13 @@ INPUT_SHOW_WAKATIME=True
 ```
 
 3. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 4. Run locally:
+
 ```bash
 python github_stats.py <username>
 ```
@@ -104,6 +108,7 @@ bash runTestLocallyDocker.sh
 **Note:** The token names for GitHub Actions are different from the local setup.
 
 1. Create `.github/workflows/github-stats.yml`:
+
 ```yaml
 name: GitHub Stats Update
 on:
@@ -138,12 +143,14 @@ jobs:
 ```
 
 2. Add these markers to your README.md:
+
 ```markdown
 <!--START_SECTION:github-stats-->
 <!--END_SECTION:github-stats-->
 ```
 
 3. (Optional) For WakaTime stats, add this separate section:
+
 ```markdown
 <!--START_SECTION:wakatime-->
 <!--END_SECTION:wakatime-->
