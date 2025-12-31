@@ -19,6 +19,7 @@ DBM.create_logger()
 
 async def run_local():
     """Run the stats generator locally"""
+    from sources.manager_download import DownloadManager as DM
     try:
         print("Starting local GitHub stats generation...")
         
@@ -136,7 +137,6 @@ async def run_local():
         
     finally:
         # Ensure cleanup happens
-        from sources.manager_download import DownloadManager as DM
         await DM.close_remote_resources()
         if os.path.exists("repo"):
             rmtree("repo")
