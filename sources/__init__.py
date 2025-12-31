@@ -8,6 +8,7 @@ from .manager_github import GitHubManager
 from .manager_file import FileManager
 from .manager_debug import DebugManager
 from .manager_token import TokenManager
+from .manager_wakatime import WakaTimeManager
 
 __all__ = [
     'DownloadManager',
@@ -15,5 +16,6 @@ __all__ = [
     'GitHubManager',
     'FileManager',
     'DebugManager',
-    'TokenManager'
+    'TokenManager',
+    'WakaTimeManager'
 ]

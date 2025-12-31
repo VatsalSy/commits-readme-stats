@@ -23,3 +23,6 @@ __pycache__/
 **/.actrc
 .cache.key
 **/*log*
+
+# Auto Claude data directory
+.auto-claude/

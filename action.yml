@@ -31,6 +31,32 @@ inputs:
     required: false
     default: '41898282+github-actions[bot]@users.noreply.github.com'
 
+  # WakaTime Integration (optional)
+  WAKATIME_API_KEY:
+    description: 'WakaTime API key for coding activity stats (optional)'
+    required: false
+    default: ''
+  SHOW_WAKATIME:
+    description: 'Enable WakaTime coding activity stats (requires WAKATIME_API_KEY)'
+    required: false
+    default: 'false'
+  SHOW_LANGUAGE:
+    description: 'Show programming languages from WakaTime'
+    required: false
+    default: 'true'
+  SHOW_EDITORS:
+    description: 'Show editors from WakaTime'
+    required: false
+    default: 'true'
+  SHOW_PROJECTS:
+    description: 'Show projects from WakaTime'
+    required: false
+    default: 'true'
+  SHOW_OS:
+    description: 'Show operating systems from WakaTime'
+    required: false
+    default: 'true'
+
 runs:
   using: 'composite'
   steps:
@@ -68,6 +94,13 @@ runs:
         COMMIT_BY_ME: ${{ inputs.COMMIT_BY_ME }}
         COMMIT_USERNAME: ${{ inputs.COMMIT_USERNAME }}
         COMMIT_EMAIL: ${{ inputs.COMMIT_EMAIL }}
+        # WakaTime environment variables
+        INPUT_WAKATIME_API_KEY: ${{ inputs.WAKATIME_API_KEY }}
+        INPUT_SHOW_WAKATIME: ${{ inputs.SHOW_WAKATIME }}
+        INPUT_SHOW_LANGUAGE: ${{ inputs.SHOW_LANGUAGE }}
+        INPUT_SHOW_EDITORS: ${{ inputs.SHOW_EDITORS }}
+        INPUT_SHOW_PROJECTS: ${{ inputs.SHOW_PROJECTS }}
+        INPUT_SHOW_OS: ${{ inputs.SHOW_OS }}
       working-directory: ${{ github.action_path }}
       run: |
         cd ${{ github.action_path }}

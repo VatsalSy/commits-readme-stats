@@ -8,6 +8,9 @@ from git.exc import GitCommandError
 import argparse
 import requests
 
+# CRITICAL: Load .env file BEFORE importing any modules that use environment variables
+load_dotenv()
+
 from sources.manager_debug import DebugManager as DBM
 from sources.manager_token import get_token_user
 
@@ -16,11 +19,9 @@ DBM.create_logger()
 
 async def run_local():
     """Run the stats generator locally"""
+    from sources.manager_download import DownloadManager as DM
     try:
         print("Starting local GitHub stats generation...")
-        
-        # Load environment variables securely
-        load_dotenv()
         
         # Parse command line arguments
         parser = argparse.ArgumentParser(description='GitHub Stats Generator')
@@ -83,15 +84,21 @@ async def run_local():
         DBM.i("Localization manager initialized")
         
         # Get stats using the main get_stats function
-        from sources.main import get_stats
-        stats = await get_stats()
-        
+        from sources.main import get_stats, get_wakatime_stats
+        commit_stats = await get_stats()
+        wakatime_stats = await get_wakatime_stats()
+
         # If not in debug mode, commit and push changes
         if not EM.DEBUG_RUN:
             try:
-                if allowPush:   
-                    # Update README with stats
-                    GHM.update_readme(stats)
+                if allowPush:
+                    # Update README with commit stats
+                    GHM.update_readme(commit_stats)
+
+                    # Update README with WakaTime stats if available
+                    if wakatime_stats:
+                        GHM.update_readme(wakatime_stats, section_name="wakatime")
+
                     # Commit and push changes
                     GHM.commit_update()
                     print("Changes committed and pushed")
@@ -101,10 +108,16 @@ async def run_local():
                 print(f"Error updating repository: {str(e)}")
                 raise
         else:
-            DBM.i("\nGenerated Statistics:")
+            DBM.i("\nGenerated Commit Statistics:")
             DBM.i("=" * 50)
-            print(stats)
+            print(commit_stats)
             DBM.i("=" * 50)
+
+            if wakatime_stats:
+                DBM.i("\nGenerated WakaTime Statistics:")
+                DBM.i("=" * 50)
+                print(wakatime_stats)
+                DBM.i("=" * 50)
         
     except GitCommandError as e:
         error_msg = DBM.handle_error(
@@ -124,6 +137,7 @@ async def run_local():
         
     finally:
         # Ensure cleanup happens
+        await DM.close_remote_resources()
         if os.path.exists("repo"):
             rmtree("repo")
 

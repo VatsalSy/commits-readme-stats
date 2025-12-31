@@ -13,9 +13,18 @@ class EnvironmentManager(BaseEnvironmentManager):
     PULL_BRANCH_NAME = getenv("INPUT_PULL_BRANCH_NAME", "")
     PUSH_BRANCH_NAME = getenv("INPUT_PUSH_BRANCH_NAME", "")
 
+    # Commit analytics settings (existing)
     SHOW_COMMIT = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_COMMIT", "True"))
     SHOW_DAYS_OF_WEEK = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_DAYS_OF_WEEK", "True"))
     SHOW_TOTAL_COMMITS = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_TOTAL_COMMITS", "True"))
+
+    # WakaTime settings (new)
+    WAKATIME_API_KEY = getenv("INPUT_WAKATIME_API_KEY", "")
+    SHOW_WAKATIME = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_WAKATIME", "False"))
+    SHOW_LANGUAGE = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_LANGUAGE", "True"))
+    SHOW_EDITORS = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_EDITORS", "True"))
+    SHOW_PROJECTS = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_PROJECTS", "True"))
+    SHOW_OS = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_OS", "True"))
 
     COMMIT_BY_ME = BaseEnvironmentManager.is_truthy(getenv("INPUT_COMMIT_BY_ME", "False"))
     COMMIT_MESSAGE = getenv("INPUT_COMMIT_MESSAGE", "Updated with Dev Metrics")
