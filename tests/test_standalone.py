@@ -3,55 +3,58 @@ Standalone test for _filter_and_renormalize_other function.
 This test can run without installing dependencies.
 """
 
-from typing import Dict, List
 
+try:
+    from sources.wakatime_formatter import _filter_and_renormalize_other
+except Exception:
+    # Fallback for dependency-free execution.
+    def _filter_and_renormalize_other(data: list[dict]) -> list[dict]:
+        """
+        Filter out "Other" entries and renormalize percentages.
 
-def _filter_and_renormalize_other(data: List[Dict]) -> List[Dict]:
-    """
-    Filter out "Other" entries and renormalize percentages.
+        Removes all entries where name.lower() == "other" and recalculates
+        percentages so remaining entries sum to 100%.
 
-    Removes all entries where name.lower() == "other" and recalculates
-    percentages so remaining entries sum to 100%.
+        Args:
+            data: List of WakaTime data items with name and percent keys
 
-    Args:
-        data: List of WakaTime data items with name and percent keys
+        Returns:
+            Filtered and renormalized list of data items
 
-    Returns:
-        Filtered and renormalized list of data items
+        Edge cases handled:
+            - Empty list: returns empty list
+            - All "Other" entries: returns empty list
+            - No "Other" entries: returns original data with adjusted decimals
+            - Zero sum: returns empty list (defensive programming)
+        """
+        if not data:
+            return []
 
-    Edge cases handled:
-        - Empty list: returns empty list
-        - All "Other" entries: returns empty list
-        - No "Other" entries: returns original data with adjusted decimals
-        - Zero sum: returns empty list (defensive programming)
-    """
-    if not data:
-        return []
+        # Filter out "Other" entries (case-insensitive)
+        # Use .copy() to avoid mutating original data
+        filtered_data = [
+            item.copy() for item in data
+            if item.get("name", "").lower() != "other"
+        ]
 
-    # Filter out "Other" entries (case-insensitive)
-    filtered_data = [
-        item for item in data
-        if item.get("name", "").lower() != "other"
-    ]
+        # If no items remain, return empty list
+        if not filtered_data:
+            return []
 
-    # If no items remain, return empty list
-    if not filtered_data:
-        return []
+        # Calculate sum of remaining percentages
+        percent_sum = sum(item.get("percent", 0.0) for item in filtered_data)
 
-    # Calculate sum of remaining percentages
-    percent_sum = sum(item.get("percent", 0.0) for item in filtered_data)
+        # Handle edge case: zero sum (defensive programming)
+        if percent_sum <= 0:
+            return []
 
-    # Handle edge case: zero sum (defensive programming)
-    if percent_sum <= 0:
-        return []
+        # Renormalize percentages to sum to 100%
+        for item in filtered_data:
+            old_percent = item.get("percent", 0.0)
+            new_percent = (old_percent / percent_sum) * 100.0
+            item["percent"] = round(new_percent, 2)
 
-    # Renormalize percentages to sum to 100%
-    for item in filtered_data:
-        old_percent = item.get("percent", 0.0)
-        new_percent = (old_percent / percent_sum) * 100.0
-        item["percent"] = round(new_percent, 2)
-
-    return filtered_data
+        return filtered_data
 
 
 # Test cases

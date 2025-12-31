@@ -165,11 +165,11 @@ if __name__ == "__main__":
             getattr(test_suite, test_name)()
             print(f"✓ {test_name}")
             passed += 1
-        except AssertionError as e:
+        except AssertionError:
             print(f"✗ {test_name}")
             traceback.print_exc()
             failed += 1
-        except Exception as e:
+        except Exception:
             print(f"✗ {test_name} (error)")
             traceback.print_exc()
             failed += 1
