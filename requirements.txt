@@ -1,6 +1,6 @@
 # GitHub integration modules:
 PyGithub==2.8.1
-GitPython==3.1.45
+GitPython==3.1.46
 
 # Request making and response parsing modules:
 httpx==0.28.1
