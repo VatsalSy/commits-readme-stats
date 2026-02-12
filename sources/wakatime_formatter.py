@@ -62,13 +62,22 @@ def _filter_and_renormalize_other(data: list[dict]) -> list[dict]:
         (item.get("percent", 0.0) / percent_sum) * 100.0
         for item in filtered_data
     ]
-    rounded = [round(value, 2) for value in renormalized]
 
-    # Keep two-decimal formatting while ensuring the final sum is exactly 100.00.
-    correction = round(100.0 - sum(rounded), 2)
-    if correction != 0:
-        target_index = max(range(len(renormalized)), key=lambda i: renormalized[i])
-        rounded[target_index] = round(rounded[target_index] + correction, 2)
+    # Use integer centi-percent units (0.01%) to keep sum at 100.00 without
+    # forcing a potentially negative correction into a single bucket.
+    scaled_units = [value * 100 for value in renormalized]
+    base_units = [int(value) for value in scaled_units]
+    remaining_units = 10000 - sum(base_units)
+    if remaining_units > 0:
+        order = sorted(
+            range(len(scaled_units)),
+            key=lambda i: (scaled_units[i] - base_units[i], renormalized[i], -i),
+            reverse=True,
+        )
+        for offset in range(remaining_units):
+            base_units[order[offset % len(order)]] += 1
+
+    rounded = [value / 100.0 for value in base_units]
 
     for index, item in enumerate(filtered_data):
         item["percent"] = rounded[index]
