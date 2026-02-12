@@ -58,10 +58,20 @@ def _filter_and_renormalize_other(data: list[dict]) -> list[dict]:
         return []
 
     # Renormalize percentages to sum to 100%
-    for item in filtered_data:
-        old_percent = item.get("percent", 0.0)
-        new_percent = (old_percent / percent_sum) * 100.0
-        item["percent"] = round(new_percent, 2)
+    renormalized = [
+        (item.get("percent", 0.0) / percent_sum) * 100.0
+        for item in filtered_data
+    ]
+    rounded = [round(value, 2) for value in renormalized]
+
+    # Keep two-decimal formatting while ensuring the final sum is exactly 100.00.
+    correction = round(100.0 - sum(rounded), 2)
+    if correction != 0:
+        target_index = max(range(len(renormalized)), key=lambda i: renormalized[i])
+        rounded[target_index] = round(rounded[target_index] + correction, 2)
+
+    for index, item in enumerate(filtered_data):
+        item["percent"] = rounded[index]
 
     return filtered_data
 

@@ -17,7 +17,14 @@ class DebugManager:
     _DATE_TEMPLATE = "date"
     _TIME_TEMPLATE = "time"
 
-    _logger: Logger
+    _logger: Logger | None = None
+
+    @staticmethod
+    def _get_logger() -> Logger:
+        """Return an initialized logger, creating a default one on demand."""
+        if DebugManager._logger is None:
+            DebugManager.create_logger("INFO")
+        return DebugManager._logger
 
     @staticmethod
     def create_logger(level: str = "INFO"):
@@ -47,25 +54,25 @@ class DebugManager:
     def g(message: str, **kwargs):
         """Log success message"""
         message = DebugManager._process_template(message, kwargs)
-        DebugManager._logger.info(f"{DebugManager._COLOR_GREEN}{message}{DebugManager._COLOR_RESET}")
+        DebugManager._get_logger().info(f"{DebugManager._COLOR_GREEN}{message}{DebugManager._COLOR_RESET}")
 
     @staticmethod
     def i(message: str, **kwargs):
         """Log info message"""
         message = DebugManager._process_template(message, kwargs)
-        DebugManager._logger.debug(f"{DebugManager._COLOR_BLUE}{message}{DebugManager._COLOR_RESET}")
+        DebugManager._get_logger().debug(f"{DebugManager._COLOR_BLUE}{message}{DebugManager._COLOR_RESET}")
 
     @staticmethod
     def w(message: str, **kwargs):
         """Log warning message"""
         message = DebugManager._process_template(message, kwargs)
-        DebugManager._logger.warning(f"{DebugManager._COLOR_YELLOW}{message}{DebugManager._COLOR_RESET}")
+        DebugManager._get_logger().warning(f"{DebugManager._COLOR_YELLOW}{message}{DebugManager._COLOR_RESET}")
 
     @staticmethod
     def p(message: str, **kwargs):
         """Log error message"""
         message = DebugManager._process_template(message, kwargs)
-        DebugManager._logger.error(f"{DebugManager._COLOR_RED}{message}{DebugManager._COLOR_RESET}")
+        DebugManager._get_logger().error(f"{DebugManager._COLOR_RED}{message}{DebugManager._COLOR_RESET}")
 
     @staticmethod
     def handle_error(error: Exception, context: str = "", mask_token: bool = True) -> str:
