@@ -23,7 +23,8 @@ class DebugManager:
         """Return an initialized logger, creating a default one on demand."""
         if DebugManager._logger is None:
             DebugManager.create_logger("INFO")
-        assert DebugManager._logger is not None
+        if DebugManager._logger is None:
+            raise RuntimeError("DebugManager logger could not be initialized.")
         return DebugManager._logger
 
     @staticmethod
@@ -60,7 +61,7 @@ class DebugManager:
     def i(message: str, **kwargs: object) -> None:
         """Log info message"""
         message = DebugManager._process_template(message, kwargs)
-        DebugManager._get_logger().debug(f"{DebugManager._COLOR_BLUE}{message}{DebugManager._COLOR_RESET}")
+        DebugManager._get_logger().info(f"{DebugManager._COLOR_BLUE}{message}{DebugManager._COLOR_RESET}")
 
     @staticmethod
     def w(message: str, **kwargs: object) -> None:
