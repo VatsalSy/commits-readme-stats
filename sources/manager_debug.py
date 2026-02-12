@@ -2,7 +2,6 @@ from logging import getLogger, Logger, StreamHandler, INFO, DEBUG
 from string import Template
 from datetime import datetime
 from humanize import precisedelta
-from typing import Dict
 
 
 class DebugManager:
@@ -24,10 +23,11 @@ class DebugManager:
         """Return an initialized logger, creating a default one on demand."""
         if DebugManager._logger is None:
             DebugManager.create_logger("INFO")
+        assert DebugManager._logger is not None
         return DebugManager._logger
 
     @staticmethod
-    def create_logger(level: str = "INFO"):
+    def create_logger(level: str = "INFO") -> None:
         """Create and configure logger"""
         DebugManager._logger = getLogger(__name__)
         DebugManager._logger.setLevel(DEBUG if level.upper() == "DEBUG" else INFO)
@@ -38,7 +38,7 @@ class DebugManager:
             DebugManager._logger.addHandler(handler)
 
     @staticmethod
-    def _process_template(message: str, kwargs: Dict) -> str:
+    def _process_template(message: str, kwargs: dict[str, object]) -> str:
         if DebugManager._DATE_TEMPLATE in kwargs:
             kwargs[DebugManager._DATE_TEMPLATE] = f"{datetime.strftime(kwargs[DebugManager._DATE_TEMPLATE], '%d-%m-%Y %H:%M:%S:%f')}"
         if DebugManager._TIME_TEMPLATE in kwargs:
@@ -51,25 +51,25 @@ class DebugManager:
         return TokenManager.mask_token(message)
 
     @staticmethod
-    def g(message: str, **kwargs):
+    def g(message: str, **kwargs: object) -> None:
         """Log success message"""
         message = DebugManager._process_template(message, kwargs)
         DebugManager._get_logger().info(f"{DebugManager._COLOR_GREEN}{message}{DebugManager._COLOR_RESET}")
 
     @staticmethod
-    def i(message: str, **kwargs):
+    def i(message: str, **kwargs: object) -> None:
         """Log info message"""
         message = DebugManager._process_template(message, kwargs)
         DebugManager._get_logger().debug(f"{DebugManager._COLOR_BLUE}{message}{DebugManager._COLOR_RESET}")
 
     @staticmethod
-    def w(message: str, **kwargs):
+    def w(message: str, **kwargs: object) -> None:
         """Log warning message"""
         message = DebugManager._process_template(message, kwargs)
         DebugManager._get_logger().warning(f"{DebugManager._COLOR_YELLOW}{message}{DebugManager._COLOR_RESET}")
 
     @staticmethod
-    def p(message: str, **kwargs):
+    def p(message: str, **kwargs: object) -> None:
         """Log error message"""
         message = DebugManager._process_template(message, kwargs)
         DebugManager._get_logger().error(f"{DebugManager._COLOR_RED}{message}{DebugManager._COLOR_RESET}")
@@ -110,7 +110,7 @@ class DebugManager:
         return f"{prefix}{error_msg}"
 
 
-def init_debug_manager():
+def init_debug_manager() -> None:
     """Initialize debug manager with appropriate log level"""
     from .manager_environment import EnvironmentManager as EM
     level = "DEBUG" if EM.DEBUG_LOGGING else "INFO"
