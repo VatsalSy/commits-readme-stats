@@ -152,4 +152,3 @@ Report:
 | No commits since last tag | Skip release and report |
 | gh unauthenticated | Run `gh auth login` |
 | Push/release rejected | Check permissions/protection rules and retry with corrected target |
-

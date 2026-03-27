@@ -128,4 +128,3 @@ Feel free to open an issue for:
 - General questions
 
 Thank you for contributing! 🎉
-
