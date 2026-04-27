@@ -20,4 +20,4 @@ black==26.3.1
 cryptography==46.0.7
 
 # Development tools
-pre-commit==4.5.1
+pre-commit==4.6.0
