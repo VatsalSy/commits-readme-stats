@@ -1,6 +1,7 @@
 from asyncio import Task
 from hashlib import sha256
 from json import dumps
+from time import monotonic, time
 from typing import Dict, List
 from asyncio import sleep
 from copy import deepcopy
@@ -39,6 +40,9 @@ query($username: String!, $after: String) {
                     login
                 }
                 isPrivate
+                defaultBranchRef {
+                    name
+                }
             }
             pageInfo {
                 hasNextPage
@@ -98,12 +102,24 @@ class DownloadManager:
     _CLIENT: AsyncClient = None
     _REMOTE_RESOURCES_CACHE = {}
     _REMOTE_RESOURCES: List[Task] = []
+    _COLLECTION_STARTED_AT = 0.0
+    _GRAPHQL_ATTEMPTS = 0
+    _LAST_GRAPHQL_REQUEST_AT = 0.0
+    _MAX_COLLECTION_SECONDS = 45 * 60
+    _MAX_GRAPHQL_ATTEMPTS = 1500
+    _MAX_HISTORY_PAGES = 100
+    _MAX_REPOSITORY_PAGES = 5
+    _MIN_GRAPHQL_REQUEST_INTERVAL_SECONDS = 1.25
     target_username: str = None
 
     @classmethod
     async def init(cls, username: str):
         """Initialize download manager with headers"""
         cls.target_username = username
+        cls._COLLECTION_STARTED_AT = monotonic()
+        cls._GRAPHQL_ATTEMPTS = 0
+        cls._LAST_GRAPHQL_REQUEST_AT = 0.0
+        cls._REMOTE_RESOURCES_CACHE = {}
         cls.headers = {
             "Authorization": f"Bearer {EM.GH_COMMIT_TOKEN}",
             "Content-Type": "application/json",
@@ -190,15 +206,36 @@ class DownloadManager:
         max_retries = 5
         result = None
         base_variables = variables.copy()
+        page_count = 0
+        seen_cursors = set()
         
         while has_next_page and retry_count < max_retries:
             try:
+                max_pages = (
+                    DownloadManager._MAX_REPOSITORY_PAGES
+                    if query == "user_repository_list"
+                    else DownloadManager._MAX_HISTORY_PAGES
+                )
+                if query != "user_identity" and page_count >= max_pages:
+                    raise Exception(
+                        f"Page budget exceeded for GraphQL query: {query}"
+                    )
+
                 request_variables = base_variables.copy()
                 if end_cursor:
                     request_variables["after"] = end_cursor
 
                 DBM.i(f"Sending GraphQL query: {query} {'with cursor' if end_cursor else ''}")
-                
+
+                elapsed = monotonic() - DownloadManager._LAST_GRAPHQL_REQUEST_AT
+                if elapsed < DownloadManager._MIN_GRAPHQL_REQUEST_INTERVAL_SECONDS:
+                    await sleep(
+                        DownloadManager._MIN_GRAPHQL_REQUEST_INTERVAL_SECONDS - elapsed
+                    )
+                DownloadManager._LAST_GRAPHQL_REQUEST_AT = monotonic()
+                DownloadManager._enforce_collection_budget()
+                DownloadManager._GRAPHQL_ATTEMPTS += 1
+
                 # Add timeout to prevent hanging
                 response = await DownloadManager._CLIENT.post(
                     "https://api.github.com/graphql",
@@ -209,12 +246,40 @@ class DownloadManager:
                     timeout=30.0  # 30 second timeout
                 )
                 
-                # Handle rate limiting
-                if response.status_code == 429:
-                    retry_after = int(response.headers.get('Retry-After', 60))
-                    DBM.w(f"Rate limit exceeded, waiting {retry_after} seconds")
-                    await sleep(retry_after)
+                try:
+                    response_data = response.json()
+                except Exception:
+                    response_data = {}
+                response_error_text = str(response_data.get("message", ""))
+                response_error_text += " " + str(response_data.get("errors", ""))
+
+                # GitHub returns secondary limits as HTTP 403, HTTP 429, or a
+                # GraphQL error inside an otherwise successful HTTP 200.
+                is_rate_limited = (
+                    response.status_code == 429
+                    or (
+                        response.status_code == 403
+                        and DownloadManager._is_rate_limit_error(response_error_text)
+                    )
+                    or (
+                        response.status_code == 200
+                        and "errors" in response_data
+                        and DownloadManager._is_rate_limit_error(response_error_text)
+                    )
+                )
+                if is_rate_limited:
                     retry_count += 1
+                    retry_after = DownloadManager._rate_limit_retry_after(
+                        response,
+                        retry_count,
+                    )
+                    DBM.w(
+                        "GitHub API rate limit reached; "
+                        f"retry {retry_count}/{max_retries} in {retry_after}s"
+                    )
+                    if retry_count >= max_retries:
+                        break
+                    await sleep(retry_after)
                     continue
 
                 # Handle transient server errors with exponential backoff
@@ -248,7 +313,7 @@ class DownloadManager:
                         
                     raise Exception(error_msg)
                     
-                data = response.json()
+                data = response_data
                 if "errors" in data:
                     error_text = TokenManager.mask_token(str(data['errors']))
                     raise Exception(f"GraphQL errors: {error_text}")
@@ -272,8 +337,20 @@ class DownloadManager:
                 if result is None:
                     result = deepcopy(page_data)
                 all_nodes.extend(connection["nodes"])
+                page_count += 1
                 has_next_page = connection["pageInfo"]["hasNextPage"]
-                end_cursor = connection["pageInfo"]["endCursor"]
+                next_cursor = connection["pageInfo"]["endCursor"]
+                if has_next_page:
+                    if (
+                        not next_cursor
+                        or next_cursor == end_cursor
+                        or next_cursor in seen_cursors
+                    ):
+                        raise Exception(
+                            f"Invalid pagination cursor for GraphQL query: {query}"
+                        )
+                    seen_cursors.add(next_cursor)
+                end_cursor = next_cursor
                     
             except Exception as e:
                 error_msg = TokenManager.mask_token(str(e))
@@ -294,6 +371,53 @@ class DownloadManager:
         elif query == "repo_commit_list":
             result["repository"]["ref"]["target"]["history"]["nodes"] = all_nodes
         return result
+
+    @staticmethod
+    def _is_rate_limit_error(message: str) -> bool:
+        """Return whether a GitHub error describes primary or secondary limiting."""
+        normalized = message.lower()
+        return any(
+            marker in normalized
+            for marker in (
+                "rate limit",
+                "abuse detection",
+                "temporarily blocked",
+            )
+        )
+
+    @staticmethod
+    def _rate_limit_retry_after(response, retry_count: int) -> int:
+        """Choose a conservative wait using GitHub headers when available."""
+        retry_after = response.headers.get("Retry-After")
+        if retry_after:
+            try:
+                return max(1, int(retry_after))
+            except (TypeError, ValueError):
+                pass
+
+        if response.headers.get("x-ratelimit-remaining") == "0":
+            try:
+                reset_at = int(response.headers["x-ratelimit-reset"])
+                return max(1, reset_at - int(time()) + 5)
+            except (KeyError, TypeError, ValueError):
+                pass
+
+        return min(60 * (2 ** (retry_count - 1)), 15 * 60)
+
+    @staticmethod
+    def _enforce_collection_budget():
+        """Abort before an exhaustive crawl can overrun its global limits."""
+        if (
+            DownloadManager._GRAPHQL_ATTEMPTS
+            >= DownloadManager._MAX_GRAPHQL_ATTEMPTS
+        ):
+            raise Exception("GraphQL request budget exceeded")
+
+        if DownloadManager._COLLECTION_STARTED_AT == 0.0:
+            DownloadManager._COLLECTION_STARTED_AT = monotonic()
+        elapsed = monotonic() - DownloadManager._COLLECTION_STARTED_AT
+        if elapsed >= DownloadManager._MAX_COLLECTION_SECONDS:
+            raise Exception("GraphQL collection time budget exceeded")
 
     @staticmethod
     async def close_remote_resources():

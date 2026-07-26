@@ -109,7 +109,10 @@ async def make_commit_day_time_list(time_zone: str, repositories: Dict, commit_d
 
     # Add total commits count if enabled
     if EM.SHOW_TOTAL_COMMITS:
-        stats += f"**Accessible unique commits across repository branches: {total_commits}** \n\n"
+        stats += (
+            "**Accessible unique authored commits on repository default branches "
+            f"(last successful crawl): {total_commits}** \n\n"
+        )
 
     if EM.SHOW_COMMIT:
         dt_names = [f"{DAY_TIME_EMOJI[i]} {FM.t(DAY_TIME_NAMES[i])}" for i in range(len(day_times))]
