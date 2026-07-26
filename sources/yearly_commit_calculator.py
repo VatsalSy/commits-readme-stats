@@ -2,16 +2,18 @@ from asyncio import sleep
 from json import dumps
 from re import search
 from datetime import datetime, timedelta
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 import os
 from hashlib import sha256
 
 from .manager_download import DownloadManager as DM
 from .manager_environment import EnvironmentManager as EM
-from .manager_github import GitHubManager as GHM
 from .manager_file import FileManager as FM
 from .manager_debug import DebugManager as DBM
 from .manager_token import TokenManager
+
+COMMIT_CACHE_MAX_AGE_SECONDS = 24 * 60 * 60
+CACHE_SCHEMA_VERSION = 2
 
 
 def ensure_cache_dir():
@@ -34,11 +36,18 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     DBM.i("Calculating commit data...")
     
     # Create cache filename with username (using hash for safety)
-    cache_filename = f"commits_{sha256(target_username.encode()).hexdigest()}.json"
+    cache_filename = (
+        f"commits_v{CACHE_SCHEMA_VERSION}_"
+        f"{sha256(target_username.encode()).hexdigest()}.json"
+    )
     
     # Try to load cached data if it's recent enough
     try:
-        cached_data = FM.cache_binary(cache_filename, assets=True)
+        cached_data = FM.cache_binary(
+            cache_filename,
+            assets=True,
+            max_age_seconds=COMMIT_CACHE_MAX_AGE_SECONDS,
+        )
         if cached_data is not None:
             yearly_data, date_data = cached_data
             
@@ -58,11 +67,22 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     DBM.i("Fetching fresh commit data...")
     yearly_data = dict()
     date_data = dict()
+    seen_commit_oids: Set[str] = set()
+
+    identity = await DM.get_remote_graphql("user_identity", username=target_username)
+    author_id = identity["user"]["id"]
     
     # Process repositories one by one
     for i, repo in enumerate(repositories, 1):
         DBM.i(f"\t{i}/{len(repositories)} Retrieving repo: {repo['owner']['login']}/{repo['name']}")
-        await update_data_with_commit_stats(repo, yearly_data, date_data, target_username)
+        await update_data_with_commit_stats(
+            repo,
+            yearly_data,
+            date_data,
+            target_username,
+            author_id,
+            seen_commit_oids,
+        )
     
     DBM.i("Commit data calculated!")
     
@@ -73,7 +93,22 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     return yearly_data, date_data
 
 
-async def update_data_with_commit_stats(repo_details: Dict, yearly_data: Dict, date_data: Dict, target_username: str):
+def repository_key(repo_details: Dict) -> str:
+    """Return a collision-safe repository identifier."""
+    return repo_details.get(
+        "nameWithOwner",
+        f"{repo_details['owner']['login']}/{repo_details['name']}",
+    )
+
+
+async def update_data_with_commit_stats(
+    repo_details: Dict,
+    yearly_data: Dict,
+    date_data: Dict,
+    target_username: str,
+    author_id: str,
+    seen_commit_oids: Set[str],
+):
     """
     Updates yearly commit data with commits from given repository.
     Skips update if the commit isn't related to any repository.
@@ -93,13 +128,13 @@ async def update_data_with_commit_stats(repo_details: Dict, yearly_data: Dict, d
         # Use TokenManager to mask any sensitive info in error message
         error_msg = TokenManager.mask_token(str(e))
         DBM.w(f"\t\tError fetching branches: {error_msg}")
-        return
+        raise
     
     # Extract branch names from the response structure
     branches = [branch["name"] for branch in branches_data["repository"]["refs"]["nodes"]]
     
-    # Track unique commit IDs
-    unique_commits = set()
+    repo_key = repository_key(repo_details)
+    repo_commit_count = 0
     
     for branch_name in branches:
         try:
@@ -107,29 +142,33 @@ async def update_data_with_commit_stats(repo_details: Dict, yearly_data: Dict, d
                 "repo_commit_list",
                 owner=repo_details["owner"]["login"],
                 name=repo_details["name"],
-                branch=branch_name
+                branch=branch_name,
+                authorId=author_id,
             )
             
             # Get the commit history nodes
             user_commits = [
                 commit for commit in commits["repository"]["ref"]["target"]["history"]["nodes"]
-                if commit["author"]["user"] and commit["author"]["user"]["login"] == target_username
-                and commit["oid"] not in unique_commits  # Only process new commits
+                if commit.get("author")
+                and commit["author"].get("user")
+                and commit["author"]["user"]["login"].lower() == target_username.lower()
+                and commit["oid"] not in seen_commit_oids
             ]
             
-            # Add commit IDs to the set
+            # Deduplicate Git objects across branches and repositories/forks.
             for commit in user_commits:
-                unique_commits.add(commit["oid"])
+                seen_commit_oids.add(commit["oid"])
+                repo_commit_count += 1
                 
                 date = search(r"\d+-\d+-\d+", commit["committedDate"]).group()
                 curr_year = datetime.fromisoformat(date).year
                 quarter = (datetime.fromisoformat(date).month - 1) // 3 + 1
 
-                if repo_details["name"] not in date_data:
-                    date_data[repo_details["name"]] = dict()
-                if branch_name not in date_data[repo_details["name"]]:
-                    date_data[repo_details["name"]][branch_name] = dict()
-                date_data[repo_details["name"]][branch_name][commit["oid"]] = commit["committedDate"]
+                if repo_key not in date_data:
+                    date_data[repo_key] = dict()
+                if branch_name not in date_data[repo_key]:
+                    date_data[repo_key][branch_name] = dict()
+                date_data[repo_key][branch_name][commit["oid"]] = commit["committedDate"]
 
                 if repo_details["primaryLanguage"] is not None:
                     if curr_year not in yearly_data:
@@ -143,9 +182,10 @@ async def update_data_with_commit_stats(repo_details: Dict, yearly_data: Dict, d
                     
         except Exception as e:
             DBM.w(f"\t\tError processing branch {branch_name}: {str(e)}")
+            raise
     
     # Print repository info with unique commit count
-    DBM.i(f"\t\t{repo_details['owner']['login']}/{repo_details['name']}: {len(unique_commits)} commits")
+    DBM.i(f"\t\t{repo_key}: {repo_commit_count} commits")
 
     if not EM.DEBUG_RUN:
         await sleep(0.4)

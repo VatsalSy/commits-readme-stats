@@ -12,6 +12,7 @@ import signal
 from contextlib import contextmanager
 import json
 import os
+import time
 
 from .manager_environment import EnvironmentManager as EM
 from .manager_debug import DebugManager as DBM
@@ -170,7 +171,12 @@ class FileManager:
             raise ValueError(f"Failed to write file: {str(e)}")
 
     @staticmethod
-    def cache_binary(name: str, content: Any = None, assets: bool = False) -> Optional[Any]:
+    def cache_binary(
+        name: str,
+        content: Any = None,
+        assets: bool = False,
+        max_age_seconds: Optional[int] = None,
+    ) -> Optional[Any]:
         """Enhanced secure cache with better encryption and token protection"""
         try:
             # Validate filename
@@ -215,6 +221,11 @@ class FileManager:
                 return None
 
             try:
+                if max_age_seconds is not None:
+                    age_seconds = time.time() - os.path.getmtime(filepath)
+                    if age_seconds > max_age_seconds:
+                        return None
+
                 with open(filepath, 'rb') as f:
                     encrypted_data = f.read()
                 try:

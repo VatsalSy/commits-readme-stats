@@ -45,6 +45,7 @@
 - Prevents double-counting of commits across branches
 - Uses commit hash tracking for accurate statistics
 - Handles merge commits and branch synchronization intelligently
+- Paginates complete author-filtered branch histories
 
 📊 **Analytics Include**
 - Time of day commit patterns (Early Bird vs Night Owl)
