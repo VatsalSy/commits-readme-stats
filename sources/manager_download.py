@@ -1,10 +1,9 @@
 from asyncio import Task
 from hashlib import sha256
 from json import dumps
-from string import Template
 from typing import Dict, List
-import os
 from asyncio import sleep
+from copy import deepcopy
 
 from httpx import AsyncClient
 
@@ -13,6 +12,14 @@ from .manager_debug import DebugManager as DBM
 from .manager_token import TokenManager
 
 GITHUB_API_QUERIES = {
+    "user_identity": """
+query($username: String!) {
+    user(login: $username) {
+        id
+        login
+    }
+}
+""",
     "user_repository_list": """
 query($username: String!, $after: String) {
     user(login: $username) {
@@ -27,6 +34,7 @@ query($username: String!, $after: String) {
                     name
                 }
                 name
+                nameWithOwner
                 owner {
                     login
                 }
@@ -41,23 +49,27 @@ query($username: String!, $after: String) {
 }
 """,
     "repo_branch_list": """
-query($owner: String!, $name: String!) {
+query($owner: String!, $name: String!, $after: String) {
     repository(owner: $owner, name: $name) {
-        refs(first: 100, refPrefix: "refs/heads/") {
+        refs(first: 100, after: $after, refPrefix: "refs/heads/") {
             nodes {
                 name
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
     }
 }
 """,
     "repo_commit_list": """
-query($owner: String!, $name: String!, $branch: String!) {
+query($owner: String!, $name: String!, $branch: String!, $authorId: ID!, $after: String) {
     repository(owner: $owner, name: $name) {
         ref(qualifiedName: $branch) {
             target {
                 ... on Commit {
-                    history(first: 100) {
+                    history(first: 100, after: $after, author: {id: $authorId}) {
                         nodes {
                             committedDate
                             oid
@@ -68,6 +80,10 @@ query($owner: String!, $name: String!, $branch: String!) {
                                     login
                                 }
                             }
+                        }
+                        pageInfo {
+                            hasNextPage
+                            endCursor
                         }
                     }
                 }
@@ -122,9 +138,10 @@ class DownloadManager:
             
         # Validate required variables based on query type
         required_vars = {
+            'user_identity': ['username'],
             'user_repository_list': ['username'],
             'repo_branch_list': ['owner', 'name'],
-            'repo_commit_list': ['owner', 'name', 'branch']
+            'repo_commit_list': ['owner', 'name', 'branch', 'authorId']
         }
         
         missing_vars = [var for var in required_vars[query] if var not in kwargs]
@@ -171,11 +188,14 @@ class DownloadManager:
         end_cursor = None
         retry_count = 0
         max_retries = 5
+        result = None
+        base_variables = variables.copy()
         
         while has_next_page and retry_count < max_retries:
             try:
+                request_variables = base_variables.copy()
                 if end_cursor:
-                    variables["after"] = end_cursor
+                    request_variables["after"] = end_cursor
 
                 DBM.i(f"Sending GraphQL query: {query} {'with cursor' if end_cursor else ''}")
                 
@@ -184,7 +204,7 @@ class DownloadManager:
                     "https://api.github.com/graphql",
                     json={
                         "query": query_str,
-                        "variables": variables
+                        "variables": request_variables
                     },
                     timeout=30.0  # 30 second timeout
                 )
@@ -236,14 +256,24 @@ class DownloadManager:
                 # Reset retry count on successful request    
                 retry_count = 0
                 
-                # Handle pagination for different query types
+                page_data = data["data"]
+                if query == "user_identity":
+                    return page_data
+
+                # Aggregate pages while retaining the response shapes used by
+                # the existing collectors.
                 if query == "user_repository_list":
-                    repos = data["data"]["user"]["repositories"]
-                    all_nodes.extend(repos["nodes"])
-                    has_next_page = repos["pageInfo"]["hasNextPage"]
-                    end_cursor = repos["pageInfo"]["endCursor"]
+                    connection = page_data["user"]["repositories"]
+                elif query == "repo_branch_list":
+                    connection = page_data["repository"]["refs"]
                 else:
-                    return data["data"]
+                    connection = page_data["repository"]["ref"]["target"]["history"]
+
+                if result is None:
+                    result = deepcopy(page_data)
+                all_nodes.extend(connection["nodes"])
+                has_next_page = connection["pageInfo"]["hasNextPage"]
+                end_cursor = connection["pageInfo"]["endCursor"]
                     
             except Exception as e:
                 error_msg = TokenManager.mask_token(str(e))
@@ -252,8 +282,18 @@ class DownloadManager:
                 
         if retry_count >= max_retries:
             raise Exception("Max retries exceeded for GraphQL query")
+
+        # Never return a truncated connection if pagination stopped early.
+        if has_next_page:
+            raise Exception(f"Incomplete pagination for GraphQL query: {query}")
             
-        return all_nodes if query == "user_repository_list" else data["data"]
+        if query == "user_repository_list":
+            return all_nodes
+        if query == "repo_branch_list":
+            result["repository"]["refs"]["nodes"] = all_nodes
+        elif query == "repo_commit_list":
+            result["repository"]["ref"]["target"]["history"]["nodes"] = all_nodes
+        return result
 
     @staticmethod
     async def close_remote_resources():
