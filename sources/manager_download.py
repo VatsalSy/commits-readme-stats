@@ -32,9 +32,6 @@ query($username: String!, $after: String) {
             ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR]
         ) {
             nodes {
-                primaryLanguage {
-                    name
-                }
                 name
                 nameWithOwner
                 owner {
@@ -78,8 +75,6 @@ query($owner: String!, $name: String!, $branch: String!, $authorId: ID!, $after:
                         nodes {
                             committedDate
                             oid
-                            additions
-                            deletions
                             author {
                                 user {
                                     login
@@ -121,8 +116,6 @@ query(
                         nodes {
                             committedDate
                             oid
-                            additions
-                            deletions
                             author {
                                 user {
                                     login

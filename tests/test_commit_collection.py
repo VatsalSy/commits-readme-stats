@@ -511,6 +511,9 @@ def test_commit_cache_expires(tmp_path, monkeypatch):
 def test_commit_query_filters_by_github_user_identity():
     assert "author: {id: $authorId}" in GITHUB_API_QUERIES["repo_commit_list"]
     assert "defaultBranchRef" in GITHUB_API_QUERIES["user_repository_list"]
+    for query_name in ("repo_commit_list", "repo_commit_list_window"):
+        assert "additions" not in GITHUB_API_QUERIES[query_name]
+        assert "deletions" not in GITHUB_API_QUERIES[query_name]
 
 
 def test_collection_safety_budgets_are_bounded():
