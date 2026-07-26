@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -9,6 +10,7 @@ from sources.manager_environment import EnvironmentManager
 from sources.manager_file import FileManager
 from sources.yearly_commit_calculator import (
     calculate_commit_data,
+    get_default_branch_commits,
     update_data_with_commit_stats,
 )
 
@@ -266,6 +268,7 @@ async def test_default_branch_history_deduplicates_across_forks():
                 "VatsalSy",
                 "user-id",
                 seen_commit_oids,
+                2016,
             )
 
     assert seen_commit_oids == {"shared", "one-only", "two-only"}
@@ -311,6 +314,7 @@ async def test_repository_collection_propagates_default_branch_failure():
                 "VatsalSy",
                 "user-id",
                 set(),
+                2016,
             )
 
 
@@ -336,14 +340,65 @@ async def test_empty_repository_skips_history_query():
             "VatsalSy",
             "user-id",
             set(),
+            2016,
         )
 
     graphql.assert_not_awaited()
 
 
 @pytest.mark.asyncio
+async def test_large_history_5xx_falls_back_to_year_window():
+    repository = {
+        "name": "large",
+        "nameWithOwner": "owner/large",
+        "owner": {"login": "owner"},
+    }
+    windowed = {
+        "repository": {
+            "ref": {
+                "target": {
+                    "history": {
+                        "nodes": [{"oid": "one"}],
+                    }
+                }
+            }
+        }
+    }
+    graphql = AsyncMock(
+        side_effect=[
+            RuntimeError("GraphQL query failed: HTTP 502"),
+            windowed,
+        ]
+    )
+    current_year = datetime.now().year
+
+    with patch.object(DownloadManager, "get_remote_graphql", new=graphql):
+        commits = await get_default_branch_commits(
+            repository,
+            "main",
+            "user-id",
+            current_year,
+        )
+
+    assert commits == [{"oid": "one"}]
+    assert graphql.await_count == 2
+    assert graphql.await_args_list[1].args == ("repo_commit_list_window",)
+    assert graphql.await_args_list[1].kwargs["since"] == (
+        f"{current_year}-01-01T00:00:00Z"
+    )
+    assert graphql.await_args_list[1].kwargs["until"] == (
+        f"{current_year + 1}-01-01T00:00:00Z"
+    )
+
+
+@pytest.mark.asyncio
 async def test_github_actions_runner_does_not_read_or_write_commit_cache():
-    identity = {"user": {"id": "user-id"}}
+    identity = {
+        "user": {
+            "id": "user-id",
+            "createdAt": "2016-02-06T00:00:00Z",
+        }
+    }
 
     with patch.dict("os.environ", {"GITHUB_ACTIONS": "true"}), patch.object(
         FileManager,

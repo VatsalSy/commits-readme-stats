@@ -75,6 +75,9 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
 
     identity = await DM.get_remote_graphql("user_identity", username=target_username)
     author_id = identity["user"]["id"]
+    account_created_year = datetime.fromisoformat(
+        identity["user"]["createdAt"].replace("Z", "+00:00")
+    ).year
     
     # Process repositories one by one
     for i, repo in enumerate(repositories, 1):
@@ -86,6 +89,7 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
             target_username,
             author_id,
             seen_commit_oids,
+            account_created_year,
         )
     
     DBM.i("Commit data calculated!")
@@ -106,6 +110,45 @@ def repository_key(repo_details: Dict) -> str:
     )
 
 
+async def get_default_branch_commits(
+    repo_details: Dict,
+    branch_name: str,
+    author_id: str,
+    account_created_year: int,
+) -> List[Dict]:
+    """Fetch one default-branch history, partitioning only persistent 5xx cases."""
+    query_args = {
+        "owner": repo_details["owner"]["login"],
+        "name": repo_details["name"],
+        "branch": branch_name,
+        "authorId": author_id,
+    }
+    try:
+        commits = await DM.get_remote_graphql("repo_commit_list", **query_args)
+        return commits["repository"]["ref"]["target"]["history"]["nodes"]
+    except Exception as error:
+        transient_markers = ("HTTP 502", "HTTP 503", "HTTP 504")
+        if not any(marker in str(error) for marker in transient_markers):
+            raise
+
+    DBM.w(
+        "\t\tFull history query failed after retries; "
+        "retrying in bounded yearly windows."
+    )
+    commit_nodes = []
+    for year in range(account_created_year, datetime.now().year + 1):
+        commits = await DM.get_remote_graphql(
+            "repo_commit_list_window",
+            **query_args,
+            since=f"{year}-01-01T00:00:00Z",
+            until=f"{year + 1}-01-01T00:00:00Z",
+        )
+        commit_nodes.extend(
+            commits["repository"]["ref"]["target"]["history"]["nodes"]
+        )
+    return commit_nodes
+
+
 async def update_data_with_commit_stats(
     repo_details: Dict,
     yearly_data: Dict,
@@ -113,6 +156,7 @@ async def update_data_with_commit_stats(
     target_username: str,
     author_id: str,
     seen_commit_oids: Set[str],
+    account_created_year: int,
 ):
     """
     Updates yearly commit data with commits from given repository.
@@ -133,17 +177,16 @@ async def update_data_with_commit_stats(
     repo_commit_count = 0
 
     try:
-        commits = await DM.get_remote_graphql(
-            "repo_commit_list",
-            owner=repo_details["owner"]["login"],
-            name=repo_details["name"],
-            branch=branch_name,
-            authorId=author_id,
+        commits = await get_default_branch_commits(
+            repo_details,
+            branch_name,
+            author_id,
+            account_created_year,
         )
 
         # Get the commit history nodes
         user_commits = [
-            commit for commit in commits["repository"]["ref"]["target"]["history"]["nodes"]
+            commit for commit in commits
             if commit.get("author")
             and commit["author"].get("user")
             and commit["author"]["user"]["login"].lower() == target_username.lower()
