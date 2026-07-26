@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from sources.graphics_list_formatter import make_commit_day_time_list
-from sources.manager_download import DownloadManager, GITHUB_API_QUERIES
+from sources.manager_download import (
+    DownloadManager,
+    GITHUB_API_QUERIES,
+    GraphQLHTTPError,
+)
 from sources.manager_environment import EnvironmentManager
 from sources.manager_file import FileManager
 from sources.yearly_commit_calculator import (
@@ -124,14 +128,17 @@ async def test_branch_list_paginates():
 
 
 @pytest.mark.asyncio
-async def test_pagination_fails_closed_after_retry_exhaustion():
+async def test_5xx_retries_preserve_status_code_from_real_response():
     client = AsyncMock()
-    client.post.return_value = FakeResponse({}, status_code=502)
+    client.post.return_value = FakeResponse(
+        {"message": "Server Error"},
+        status_code=502,
+    )
 
     with patch.object(DownloadManager, "_CLIENT", client), patch(
         "sources.manager_download.sleep", new=AsyncMock()
     ):
-        with pytest.raises(Exception, match="GraphQL query failed"):
+        with pytest.raises(GraphQLHTTPError) as error:
             await DownloadManager._fetch_graphql_query(
                 "repo_commit_list",
                 {
@@ -142,6 +149,8 @@ async def test_pagination_fails_closed_after_retry_exhaustion():
                 },
             )
 
+    assert error.value.status_code == 502
+    assert str(error.value) == "GraphQL query failed (HTTP 502): Server Error"
     assert client.post.await_count == 5
 
 
@@ -354,25 +363,43 @@ async def test_large_history_5xx_falls_back_to_year_window():
         "owner": {"login": "owner"},
     }
     windowed = {
-        "repository": {
-            "ref": {
-                "target": {
-                    "history": {
-                        "nodes": [{"oid": "one"}],
+        "data": {
+            "repository": {
+                "ref": {
+                    "target": {
+                        "history": {
+                            "nodes": [{"oid": "one"}],
+                            "pageInfo": {
+                                "hasNextPage": False,
+                                "endCursor": None,
+                            },
+                        }
                     }
                 }
             }
         }
     }
-    graphql = AsyncMock(
-        side_effect=[
-            RuntimeError("GraphQL query failed: HTTP 502"),
-            windowed,
-        ]
-    )
+    client = AsyncMock()
+    client.post.side_effect = [
+        *[
+            FakeResponse({"message": "Server Error"}, status_code=502)
+            for _ in range(5)
+        ],
+        FakeResponse(windowed),
+    ]
     current_year = datetime.now().year
 
-    with patch.object(DownloadManager, "get_remote_graphql", new=graphql):
+    with patch.object(DownloadManager, "_CLIENT", client), patch.object(
+        DownloadManager, "_REMOTE_RESOURCES_CACHE", {}
+    ), patch.object(
+        DownloadManager, "_GRAPHQL_ATTEMPTS", 0
+    ), patch.object(
+        DownloadManager, "_COLLECTION_STARTED_AT", 0.0
+    ), patch.object(
+        DownloadManager, "_MIN_GRAPHQL_REQUEST_INTERVAL_SECONDS", 0
+    ), patch(
+        "sources.manager_download.sleep", new=AsyncMock()
+    ):
         commits = await get_default_branch_commits(
             repository,
             "main",
@@ -381,12 +408,15 @@ async def test_large_history_5xx_falls_back_to_year_window():
         )
 
     assert commits == [{"oid": "one"}]
-    assert graphql.await_count == 2
-    assert graphql.await_args_list[1].args == ("repo_commit_list_window",)
-    assert graphql.await_args_list[1].kwargs["since"] == (
+    assert client.post.await_count == 6
+    full_history_request = client.post.await_args_list[0].kwargs["json"]
+    yearly_window_request = client.post.await_args_list[-1].kwargs["json"]
+    assert "$since" not in full_history_request["query"]
+    assert "$since" in yearly_window_request["query"]
+    assert yearly_window_request["variables"]["since"] == (
         f"{current_year}-01-01T00:00:00Z"
     )
-    assert graphql.await_args_list[1].kwargs["until"] == (
+    assert yearly_window_request["variables"]["until"] == (
         f"{current_year + 1}-01-01T00:00:00Z"
     )
 
