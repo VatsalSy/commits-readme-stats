@@ -141,6 +141,59 @@ async def test_pagination_fails_closed_after_retry_exhaustion():
 
 
 @pytest.mark.asyncio
+async def test_secondary_rate_limit_retries_the_current_page():
+    limited = {
+        "errors": [
+            {
+                "type": "RATE_LIMITED",
+                "message": "You have exceeded a secondary rate limit.",
+            }
+        ]
+    }
+    success = {
+        "data": {
+            "repository": {
+                "ref": {
+                    "target": {
+                        "history": {
+                            "nodes": [{"oid": "one"}],
+                            "pageInfo": {
+                                "hasNextPage": False,
+                                "endCursor": "cursor-1",
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+    client = AsyncMock()
+    client.post.side_effect = [
+        FakeResponse(limited),
+        FakeResponse(success),
+    ]
+    sleeper = AsyncMock()
+
+    with patch.object(DownloadManager, "_CLIENT", client), patch.object(
+        DownloadManager, "_MIN_GRAPHQL_REQUEST_INTERVAL_SECONDS", 0
+    ), patch("sources.manager_download.sleep", new=sleeper):
+        result = await DownloadManager._fetch_graphql_query(
+            "repo_commit_list",
+            {
+                "owner": "owner",
+                "name": "repo",
+                "branch": "main",
+                "authorId": "user-id",
+            },
+        )
+
+    history = result["repository"]["ref"]["target"]["history"]
+    assert [node["oid"] for node in history["nodes"]] == ["one"]
+    assert client.post.await_count == 2
+    sleeper.assert_awaited_once_with(60)
+
+
+@pytest.mark.asyncio
 async def test_branch_history_deduplicates_across_branches_and_forks():
     repositories = [
         {
