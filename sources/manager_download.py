@@ -12,6 +12,18 @@ from .manager_environment import EnvironmentManager as EM
 from .manager_debug import DebugManager as DBM
 from .manager_token import TokenManager
 
+
+class GraphQLHTTPError(Exception):
+    """A GraphQL transport failure that retains its HTTP status."""
+
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        super().__init__(
+            f"GraphQL query failed (HTTP {status_code}): "
+            f"{message or 'No response message'}"
+        )
+
+
 GITHUB_API_QUERIES = {
     "user_identity": """
 query($username: String!) {
@@ -352,11 +364,10 @@ class DownloadManager:
                         # Fallback to basic error if JSON parsing fails
                         masked_error = f"HTTP {status_code}"
                         
-                    error_msg = f"GraphQL query failed: {masked_error}"
                     if EM.DEBUG_RUN:
-                        error_msg += f"\nHeaders: {masked_headers}"
+                        masked_error += f"\nHeaders: {masked_headers}"
                         
-                    raise Exception(error_msg)
+                    raise GraphQLHTTPError(status_code, masked_error)
                     
                 data = response_data
                 if "errors" in data:

@@ -4,7 +4,7 @@ from typing import Dict, Tuple, List, Set
 import os
 from hashlib import sha256
 
-from .manager_download import DownloadManager as DM
+from .manager_download import DownloadManager as DM, GraphQLHTTPError
 from .manager_environment import EnvironmentManager as EM
 from .manager_file import FileManager as FM
 from .manager_debug import DebugManager as DBM
@@ -124,9 +124,8 @@ async def get_default_branch_commits(
     try:
         commits = await DM.get_remote_graphql("repo_commit_list", **query_args)
         return commits["repository"]["ref"]["target"]["history"]["nodes"]
-    except Exception as error:
-        transient_markers = ("HTTP 502", "HTTP 503", "HTTP 504")
-        if not any(marker in str(error) for marker in transient_markers):
+    except GraphQLHTTPError as error:
+        if error.status_code not in (502, 503, 504):
             raise
 
     DBM.w(
