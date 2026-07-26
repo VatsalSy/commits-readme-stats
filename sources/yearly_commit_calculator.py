@@ -1,7 +1,6 @@
 from asyncio import sleep
-from json import dumps
 from re import search
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Tuple, List, Set
 import os
 from hashlib import sha256
@@ -10,10 +9,9 @@ from .manager_download import DownloadManager as DM
 from .manager_environment import EnvironmentManager as EM
 from .manager_file import FileManager as FM
 from .manager_debug import DebugManager as DBM
-from .manager_token import TokenManager
 
-COMMIT_CACHE_MAX_AGE_SECONDS = 24 * 60 * 60
-CACHE_SCHEMA_VERSION = 2
+COMMIT_CACHE_MAX_AGE_SECONDS = 36 * 60 * 60
+CACHE_SCHEMA_VERSION = 3
 
 
 def ensure_cache_dir():
@@ -32,8 +30,10 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     :param target_username: GitHub username of the authenticated user.
     :returns: Commit quarter yearly data dictionary.
     """
-    ensure_cache_dir()
     DBM.i("Calculating commit data...")
+    cache_enabled = os.getenv("GITHUB_ACTIONS", "").lower() != "true"
+    if cache_enabled:
+        ensure_cache_dir()
     
     # Create cache filename with username (using hash for safety)
     cache_filename = (
@@ -41,28 +41,32 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
         f"{sha256(target_username.encode()).hexdigest()}.json"
     )
     
-    # Try to load cached data if it's recent enough
-    try:
-        cached_data = FM.cache_binary(
-            cache_filename,
-            assets=True,
-            max_age_seconds=COMMIT_CACHE_MAX_AGE_SECONDS,
-        )
-        if cached_data is not None:
-            yearly_data, date_data = cached_data
-            
-            # Validate cache structure without using string operations
-            if (isinstance(yearly_data, dict) and 
-                isinstance(date_data, dict) and
-                all(isinstance(v, dict) for v in yearly_data.values()) and
-                all(isinstance(v, dict) for v in date_data.values())):
+    # GitHub-hosted runners are ephemeral. Avoid producing a cache that cannot
+    # be reused, and never upload private-history metadata to a public cache.
+    if cache_enabled:
+        try:
+            cached_data = FM.cache_binary(
+                cache_filename,
+                assets=True,
+                max_age_seconds=COMMIT_CACHE_MAX_AGE_SECONDS,
+            )
+            if cached_data is not None:
+                yearly_data, date_data = cached_data
                 
-                DBM.i("Commit data restored from cache!")
-                return yearly_data, date_data
-            else:
-                DBM.w("Cache data validation failed - fetching fresh data")
-    except Exception as e:
-        DBM.w(f"Cache load failed: {str(e)} - fetching fresh data")
+                # Validate cache structure without using string operations
+                if (isinstance(yearly_data, dict) and
+                    isinstance(date_data, dict) and
+                    all(isinstance(v, dict) for v in yearly_data.values()) and
+                    all(isinstance(v, dict) for v in date_data.values())):
+
+                    DBM.i("Commit data restored from cache!")
+                    return yearly_data, date_data
+                else:
+                    DBM.w("Cache data validation failed - fetching fresh data")
+        except Exception as e:
+            DBM.w(f"Cache load failed: {str(e)} - fetching fresh data")
+    else:
+        DBM.i("Skipping commit cache on the GitHub-hosted runner.")
 
     DBM.i("Fetching fresh commit data...")
     yearly_data = dict()
@@ -86,9 +90,10 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
     
     DBM.i("Commit data calculated!")
     
-    # Cache the data for this specific username
-    FM.cache_binary(cache_filename, [yearly_data, date_data], assets=True)
-    DBM.i("New commit data saved to cache!")
+    if cache_enabled:
+        # Cache the data for this specific username during local development.
+        FM.cache_binary(cache_filename, [yearly_data, date_data], assets=True)
+        DBM.i("New commit data saved to cache!")
     
     return yearly_data, date_data
 
@@ -118,71 +123,61 @@ async def update_data_with_commit_stats(
     :param date_data: Commit date dictionary to update.
     :param target_username: GitHub username of the authenticated user.
     """
-    try:
-        branches_data = await DM.get_remote_graphql(
-            "repo_branch_list",
-            owner=repo_details["owner"]["login"],
-            name=repo_details["name"]
-        )
-    except Exception as e:
-        # Use TokenManager to mask any sensitive info in error message
-        error_msg = TokenManager.mask_token(str(e))
-        DBM.w(f"\t\tError fetching branches: {error_msg}")
-        raise
-    
-    # Extract branch names from the response structure
-    branches = [branch["name"] for branch in branches_data["repository"]["refs"]["nodes"]]
-    
     repo_key = repository_key(repo_details)
+    default_branch = repo_details.get("defaultBranchRef")
+    branch_name = default_branch.get("name") if default_branch else None
+    if not branch_name:
+        DBM.i(f"\t\t{repo_key}: skipped empty repository")
+        return
+
     repo_commit_count = 0
-    
-    for branch_name in branches:
-        try:
-            commits = await DM.get_remote_graphql(
-                "repo_commit_list",
-                owner=repo_details["owner"]["login"],
-                name=repo_details["name"],
-                branch=branch_name,
-                authorId=author_id,
-            )
+
+    try:
+        commits = await DM.get_remote_graphql(
+            "repo_commit_list",
+            owner=repo_details["owner"]["login"],
+            name=repo_details["name"],
+            branch=branch_name,
+            authorId=author_id,
+        )
+
+        # Get the commit history nodes
+        user_commits = [
+            commit for commit in commits["repository"]["ref"]["target"]["history"]["nodes"]
+            if commit.get("author")
+            and commit["author"].get("user")
+            and commit["author"]["user"]["login"].lower() == target_username.lower()
+            and commit["oid"] not in seen_commit_oids
+        ]
+
+        # Deduplicate Git objects across repositories and forks.
+        for commit in user_commits:
+            seen_commit_oids.add(commit["oid"])
+            repo_commit_count += 1
             
-            # Get the commit history nodes
-            user_commits = [
-                commit for commit in commits["repository"]["ref"]["target"]["history"]["nodes"]
-                if commit.get("author")
-                and commit["author"].get("user")
-                and commit["author"]["user"]["login"].lower() == target_username.lower()
-                and commit["oid"] not in seen_commit_oids
-            ]
-            
-            # Deduplicate Git objects across branches and repositories/forks.
-            for commit in user_commits:
-                seen_commit_oids.add(commit["oid"])
-                repo_commit_count += 1
+            date = search(r"\d+-\d+-\d+", commit["committedDate"]).group()
+            curr_year = datetime.fromisoformat(date).year
+            quarter = (datetime.fromisoformat(date).month - 1) // 3 + 1
+
+            if repo_key not in date_data:
+                date_data[repo_key] = dict()
+            if branch_name not in date_data[repo_key]:
+                date_data[repo_key][branch_name] = dict()
+            date_data[repo_key][branch_name][commit["oid"]] = commit["committedDate"]
+
+            if repo_details["primaryLanguage"] is not None:
+                if curr_year not in yearly_data:
+                    yearly_data[curr_year] = dict()
+                if quarter not in yearly_data[curr_year]:
+                    yearly_data[curr_year][quarter] = dict()
+                if repo_details["primaryLanguage"]["name"] not in yearly_data[curr_year][quarter]:
+                    yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]] = {"add": 0, "del": 0}
+                yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["add"] += commit["additions"]
+                yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["del"] += commit["deletions"]
                 
-                date = search(r"\d+-\d+-\d+", commit["committedDate"]).group()
-                curr_year = datetime.fromisoformat(date).year
-                quarter = (datetime.fromisoformat(date).month - 1) // 3 + 1
-
-                if repo_key not in date_data:
-                    date_data[repo_key] = dict()
-                if branch_name not in date_data[repo_key]:
-                    date_data[repo_key][branch_name] = dict()
-                date_data[repo_key][branch_name][commit["oid"]] = commit["committedDate"]
-
-                if repo_details["primaryLanguage"] is not None:
-                    if curr_year not in yearly_data:
-                        yearly_data[curr_year] = dict()
-                    if quarter not in yearly_data[curr_year]:
-                        yearly_data[curr_year][quarter] = dict()
-                    if repo_details["primaryLanguage"]["name"] not in yearly_data[curr_year][quarter]:
-                        yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]] = {"add": 0, "del": 0}
-                    yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["add"] += commit["additions"]
-                    yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["del"] += commit["deletions"]
-                    
-        except Exception as e:
-            DBM.w(f"\t\tError processing branch {branch_name}: {str(e)}")
-            raise
+    except Exception as e:
+        DBM.w(f"\t\tError processing default branch {branch_name}: {str(e)}")
+        raise
     
     # Print repository info with unique commit count
     DBM.i(f"\t\t{repo_key}: {repo_commit_count} commits")

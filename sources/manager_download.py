@@ -40,6 +40,9 @@ query($username: String!, $after: String) {
                     login
                 }
                 isPrivate
+                defaultBranchRef {
+                    name
+                }
             }
             pageInfo {
                 hasNextPage
@@ -99,7 +102,13 @@ class DownloadManager:
     _CLIENT: AsyncClient = None
     _REMOTE_RESOURCES_CACHE = {}
     _REMOTE_RESOURCES: List[Task] = []
+    _COLLECTION_STARTED_AT = 0.0
+    _GRAPHQL_ATTEMPTS = 0
     _LAST_GRAPHQL_REQUEST_AT = 0.0
+    _MAX_COLLECTION_SECONDS = 45 * 60
+    _MAX_GRAPHQL_ATTEMPTS = 1500
+    _MAX_HISTORY_PAGES = 100
+    _MAX_REPOSITORY_PAGES = 5
     _MIN_GRAPHQL_REQUEST_INTERVAL_SECONDS = 1.25
     target_username: str = None
 
@@ -107,6 +116,10 @@ class DownloadManager:
     async def init(cls, username: str):
         """Initialize download manager with headers"""
         cls.target_username = username
+        cls._COLLECTION_STARTED_AT = monotonic()
+        cls._GRAPHQL_ATTEMPTS = 0
+        cls._LAST_GRAPHQL_REQUEST_AT = 0.0
+        cls._REMOTE_RESOURCES_CACHE = {}
         cls.headers = {
             "Authorization": f"Bearer {EM.GH_COMMIT_TOKEN}",
             "Content-Type": "application/json",
@@ -193,9 +206,21 @@ class DownloadManager:
         max_retries = 5
         result = None
         base_variables = variables.copy()
+        page_count = 0
+        seen_cursors = set()
         
         while has_next_page and retry_count < max_retries:
             try:
+                max_pages = (
+                    DownloadManager._MAX_REPOSITORY_PAGES
+                    if query == "user_repository_list"
+                    else DownloadManager._MAX_HISTORY_PAGES
+                )
+                if query != "user_identity" and page_count >= max_pages:
+                    raise Exception(
+                        f"Page budget exceeded for GraphQL query: {query}"
+                    )
+
                 request_variables = base_variables.copy()
                 if end_cursor:
                     request_variables["after"] = end_cursor
@@ -208,6 +233,8 @@ class DownloadManager:
                         DownloadManager._MIN_GRAPHQL_REQUEST_INTERVAL_SECONDS - elapsed
                     )
                 DownloadManager._LAST_GRAPHQL_REQUEST_AT = monotonic()
+                DownloadManager._enforce_collection_budget()
+                DownloadManager._GRAPHQL_ATTEMPTS += 1
 
                 # Add timeout to prevent hanging
                 response = await DownloadManager._CLIENT.post(
@@ -310,8 +337,20 @@ class DownloadManager:
                 if result is None:
                     result = deepcopy(page_data)
                 all_nodes.extend(connection["nodes"])
+                page_count += 1
                 has_next_page = connection["pageInfo"]["hasNextPage"]
-                end_cursor = connection["pageInfo"]["endCursor"]
+                next_cursor = connection["pageInfo"]["endCursor"]
+                if has_next_page:
+                    if (
+                        not next_cursor
+                        or next_cursor == end_cursor
+                        or next_cursor in seen_cursors
+                    ):
+                        raise Exception(
+                            f"Invalid pagination cursor for GraphQL query: {query}"
+                        )
+                    seen_cursors.add(next_cursor)
+                end_cursor = next_cursor
                     
             except Exception as e:
                 error_msg = TokenManager.mask_token(str(e))
@@ -364,6 +403,21 @@ class DownloadManager:
                 pass
 
         return min(60 * (2 ** (retry_count - 1)), 15 * 60)
+
+    @staticmethod
+    def _enforce_collection_budget():
+        """Abort before an exhaustive crawl can overrun its global limits."""
+        if (
+            DownloadManager._GRAPHQL_ATTEMPTS
+            >= DownloadManager._MAX_GRAPHQL_ATTEMPTS
+        ):
+            raise Exception("GraphQL request budget exceeded")
+
+        if DownloadManager._COLLECTION_STARTED_AT == 0.0:
+            DownloadManager._COLLECTION_STARTED_AT = monotonic()
+        elapsed = monotonic() - DownloadManager._COLLECTION_STARTED_AT
+        if elapsed >= DownloadManager._MAX_COLLECTION_SECONDS:
+            raise Exception("GraphQL collection time budget exceeded")
 
     @staticmethod
     async def close_remote_resources():

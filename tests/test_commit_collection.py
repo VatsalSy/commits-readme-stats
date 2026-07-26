@@ -7,7 +7,10 @@ from sources.graphics_list_formatter import make_commit_day_time_list
 from sources.manager_download import DownloadManager, GITHUB_API_QUERIES
 from sources.manager_environment import EnvironmentManager
 from sources.manager_file import FileManager
-from sources.yearly_commit_calculator import update_data_with_commit_stats
+from sources.yearly_commit_calculator import (
+    calculate_commit_data,
+    update_data_with_commit_stats,
+)
 
 
 class FakeResponse:
@@ -194,19 +197,21 @@ async def test_secondary_rate_limit_retries_the_current_page():
 
 
 @pytest.mark.asyncio
-async def test_branch_history_deduplicates_across_branches_and_forks():
+async def test_default_branch_history_deduplicates_across_forks():
     repositories = [
         {
             "name": "same-name",
             "nameWithOwner": "one/same-name",
             "owner": {"login": "one"},
             "primaryLanguage": {"name": "Python"},
+            "defaultBranchRef": {"name": "main"},
         },
         {
             "name": "same-name",
             "nameWithOwner": "two/same-name",
             "owner": {"login": "two"},
             "primaryLanguage": {"name": "Python"},
+            "defaultBranchRef": {"name": "main"},
         },
     ]
     commits = {
@@ -225,15 +230,6 @@ async def test_branch_history_deduplicates_across_branches_and_forks():
                 "deletions": 0,
                 "author": {"user": {"login": "VatsalSy"}},
             },
-        ],
-        ("one", "feature"): [
-            {
-                "oid": "shared",
-                "committedDate": "2026-01-01T12:00:00Z",
-                "additions": 1,
-                "deletions": 0,
-                "author": {"user": {"login": "VatsalSy"}},
-            }
         ],
         ("two", "main"): [
             {
@@ -254,13 +250,6 @@ async def test_branch_history_deduplicates_across_branches_and_forks():
     }
 
     async def graphql(query, **kwargs):
-        if query == "repo_branch_list":
-            branch_names = ["main", "feature"] if kwargs["owner"] == "one" else ["main"]
-            return {
-                "repository": {
-                    "refs": {"nodes": [{"name": name} for name in branch_names]}
-                }
-            }
         nodes = commits[(kwargs["owner"], kwargs["branch"])]
         return {"repository": {"ref": {"target": {"history": {"nodes": nodes}}}}}
 
@@ -294,21 +283,23 @@ async def test_branch_history_deduplicates_across_branches_and_forks():
         EnvironmentManager, "SHOW_COMMIT", False
     ), patch.object(EnvironmentManager, "SHOW_DAYS_OF_WEEK", False):
         output = await make_commit_day_time_list("UTC", repositories, date_data)
-    assert "Accessible unique commits across repository branches: 3" in output
+    assert (
+        "Accessible unique authored commits on repository default branches "
+        "(last successful crawl): 3"
+    ) in output
 
 
 @pytest.mark.asyncio
-async def test_repository_collection_propagates_branch_failure():
+async def test_repository_collection_propagates_default_branch_failure():
     repository = {
         "name": "repo",
         "nameWithOwner": "owner/repo",
         "owner": {"login": "owner"},
         "primaryLanguage": {"name": "Python"},
+        "defaultBranchRef": {"name": "main"},
     }
 
     async def graphql(query, **kwargs):
-        if query == "repo_branch_list":
-            return {"repository": {"refs": {"nodes": [{"name": "main"}]}}}
         raise RuntimeError("branch failed")
 
     with patch.object(DownloadManager, "get_remote_graphql", side_effect=graphql):
@@ -321,6 +312,126 @@ async def test_repository_collection_propagates_branch_failure():
                 "user-id",
                 set(),
             )
+
+
+@pytest.mark.asyncio
+async def test_empty_repository_skips_history_query():
+    repository = {
+        "name": "empty",
+        "nameWithOwner": "owner/empty",
+        "owner": {"login": "owner"},
+        "primaryLanguage": None,
+        "defaultBranchRef": None,
+    }
+
+    with patch.object(
+        DownloadManager,
+        "get_remote_graphql",
+        new=AsyncMock(),
+    ) as graphql:
+        await update_data_with_commit_stats(
+            repository,
+            {},
+            {},
+            "VatsalSy",
+            "user-id",
+            set(),
+        )
+
+    graphql.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_github_actions_runner_does_not_read_or_write_commit_cache():
+    identity = {"user": {"id": "user-id"}}
+
+    with patch.dict("os.environ", {"GITHUB_ACTIONS": "true"}), patch.object(
+        FileManager,
+        "cache_binary",
+    ) as cache_binary, patch.object(
+        DownloadManager,
+        "get_remote_graphql",
+        new=AsyncMock(return_value=identity),
+    ):
+        await calculate_commit_data([], "VatsalSy")
+
+    cache_binary.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_pagination_rejects_missing_next_cursor():
+    page = {
+        "data": {
+            "repository": {
+                "ref": {
+                    "target": {
+                        "history": {
+                            "nodes": [{"oid": "one"}],
+                            "pageInfo": {
+                                "hasNextPage": True,
+                                "endCursor": None,
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+    client = AsyncMock()
+    client.post.return_value = FakeResponse(page)
+
+    with patch.object(DownloadManager, "_CLIENT", client), patch.object(
+        DownloadManager, "_MIN_GRAPHQL_REQUEST_INTERVAL_SECONDS", 0
+    ):
+        with pytest.raises(Exception, match="Invalid pagination cursor"):
+            await DownloadManager._fetch_graphql_query(
+                "repo_commit_list",
+                {
+                    "owner": "owner",
+                    "name": "repo",
+                    "branch": "main",
+                    "authorId": "user-id",
+                },
+            )
+
+
+@pytest.mark.asyncio
+async def test_history_page_budget_fails_closed():
+    page = {
+        "data": {
+            "repository": {
+                "ref": {
+                    "target": {
+                        "history": {
+                            "nodes": [{"oid": "one"}],
+                            "pageInfo": {
+                                "hasNextPage": True,
+                                "endCursor": "cursor-1",
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+    client = AsyncMock()
+    client.post.return_value = FakeResponse(page)
+
+    with patch.object(DownloadManager, "_CLIENT", client), patch.object(
+        DownloadManager, "_MIN_GRAPHQL_REQUEST_INTERVAL_SECONDS", 0
+    ), patch.object(DownloadManager, "_MAX_HISTORY_PAGES", 1):
+        with pytest.raises(Exception, match="Page budget exceeded"):
+            await DownloadManager._fetch_graphql_query(
+                "repo_commit_list",
+                {
+                    "owner": "owner",
+                    "name": "repo",
+                    "branch": "main",
+                    "authorId": "user-id",
+                },
+            )
+
+    assert client.post.await_count == 1
 
 
 def test_commit_cache_expires(tmp_path, monkeypatch):
@@ -344,3 +455,11 @@ def test_commit_cache_expires(tmp_path, monkeypatch):
 
 def test_commit_query_filters_by_github_user_identity():
     assert "author: {id: $authorId}" in GITHUB_API_QUERIES["repo_commit_list"]
+    assert "defaultBranchRef" in GITHUB_API_QUERIES["user_repository_list"]
+
+
+def test_collection_safety_budgets_are_bounded():
+    assert DownloadManager._MAX_REPOSITORY_PAGES == 5
+    assert DownloadManager._MAX_HISTORY_PAGES == 100
+    assert DownloadManager._MAX_GRAPHQL_ATTEMPTS == 1500
+    assert DownloadManager._MAX_COLLECTION_SECONDS == 45 * 60

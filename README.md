@@ -42,10 +42,10 @@
 - Perfect for understanding your coding schedule
 
 🔄 **Smart Commit Tracking**
-- Prevents double-counting of commits across branches
-- Uses commit hash tracking for accurate statistics
-- Handles merge commits and branch synchronization intelligently
-- Paginates complete author-filtered branch histories
+- Counts authored commits reachable from each accessible default branch
+- Deduplicates commit object IDs across repositories and forks
+- Uses GitHub account identity rather than author-name matching
+- Paginates with fail-closed page, request, cursor, and time budgets
 
 📊 **Analytics Include**
 - Time of day commit patterns (Early Bird vs Night Owl)
@@ -114,7 +114,7 @@ bash runTestLocallyDocker.sh
 name: GitHub Stats Update
 on:
   schedule:
-    - cron: '0 */4 * * *'  # Runs every 4 hours
+    - cron: '0 3 * * *'  # Runs daily at 03:00 UTC
   workflow_dispatch:      # Allows manual trigger
 
 jobs:
