@@ -1,5 +1,4 @@
 from asyncio import sleep
-from re import search
 from datetime import datetime
 from typing import Dict, Tuple, List, Set
 import os
@@ -23,8 +22,7 @@ def ensure_cache_dir():
 
 async def calculate_commit_data(repositories: List[Dict], target_username: str) -> Tuple[Dict, Dict]:
     """
-    Calculate commit data by years with secure caching.
-    Commit data includes contribution additions and deletions in each quarter of each recorded year.
+    Calculate authored commit timestamps with secure local caching.
 
     :param repositories: user repositories info dictionary.
     :param target_username: GitHub username of the authenticated user.
@@ -198,25 +196,11 @@ async def update_data_with_commit_stats(
             seen_commit_oids.add(commit["oid"])
             repo_commit_count += 1
             
-            date = search(r"\d+-\d+-\d+", commit["committedDate"]).group()
-            curr_year = datetime.fromisoformat(date).year
-            quarter = (datetime.fromisoformat(date).month - 1) // 3 + 1
-
             if repo_key not in date_data:
                 date_data[repo_key] = dict()
             if branch_name not in date_data[repo_key]:
                 date_data[repo_key][branch_name] = dict()
             date_data[repo_key][branch_name][commit["oid"]] = commit["committedDate"]
-
-            if repo_details["primaryLanguage"] is not None:
-                if curr_year not in yearly_data:
-                    yearly_data[curr_year] = dict()
-                if quarter not in yearly_data[curr_year]:
-                    yearly_data[curr_year][quarter] = dict()
-                if repo_details["primaryLanguage"]["name"] not in yearly_data[curr_year][quarter]:
-                    yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]] = {"add": 0, "del": 0}
-                yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["add"] += commit["additions"]
-                yearly_data[curr_year][quarter][repo_details["primaryLanguage"]["name"]]["del"] += commit["deletions"]
                 
     except Exception as e:
         DBM.w(f"\t\tError processing default branch {branch_name}: {str(e)}")
