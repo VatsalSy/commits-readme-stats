@@ -18,6 +18,7 @@ query($username: String!) {
     user(login: $username) {
         id
         login
+        createdAt
     }
 }
 """,
@@ -74,6 +75,49 @@ query($owner: String!, $name: String!, $branch: String!, $authorId: ID!, $after:
             target {
                 ... on Commit {
                     history(first: 100, after: $after, author: {id: $authorId}) {
+                        nodes {
+                            committedDate
+                            oid
+                            additions
+                            deletions
+                            author {
+                                user {
+                                    login
+                                }
+                            }
+                        }
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+""",
+    "repo_commit_list_window": """
+query(
+    $owner: String!,
+    $name: String!,
+    $branch: String!,
+    $authorId: ID!,
+    $since: GitTimestamp!,
+    $until: GitTimestamp!,
+    $after: String
+) {
+    repository(owner: $owner, name: $name) {
+        ref(qualifiedName: $branch) {
+            target {
+                ... on Commit {
+                    history(
+                        first: 100,
+                        after: $after,
+                        author: {id: $authorId},
+                        since: $since,
+                        until: $until
+                    ) {
                         nodes {
                             committedDate
                             oid
@@ -157,7 +201,15 @@ class DownloadManager:
             'user_identity': ['username'],
             'user_repository_list': ['username'],
             'repo_branch_list': ['owner', 'name'],
-            'repo_commit_list': ['owner', 'name', 'branch', 'authorId']
+            'repo_commit_list': ['owner', 'name', 'branch', 'authorId'],
+            'repo_commit_list_window': [
+                'owner',
+                'name',
+                'branch',
+                'authorId',
+                'since',
+                'until',
+            ],
         }
         
         missing_vars = [var for var in required_vars[query] if var not in kwargs]
@@ -368,7 +420,7 @@ class DownloadManager:
             return all_nodes
         if query == "repo_branch_list":
             result["repository"]["refs"]["nodes"] = all_nodes
-        elif query == "repo_commit_list":
+        elif query in ("repo_commit_list", "repo_commit_list_window"):
             result["repository"]["ref"]["target"]["history"]["nodes"] = all_nodes
         return result
 
