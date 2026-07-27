@@ -294,10 +294,15 @@ async def test_default_branch_history_deduplicates_across_forks():
     with patch.object(EnvironmentManager, "SHOW_TOTAL_COMMITS", True), patch.object(
         EnvironmentManager, "SHOW_COMMIT", False
     ), patch.object(EnvironmentManager, "SHOW_DAYS_OF_WEEK", False):
-        output = await make_commit_day_time_list("UTC", repositories, date_data)
+        output = await make_commit_day_time_list(
+            "UTC",
+            repositories,
+            date_data,
+            datetime.fromisoformat("2026-07-27T06:24:00+00:00"),
+        )
     assert (
-        "Accessible unique authored commits on repository default branches "
-        "(last successful crawl): 3"
+        "**Unique authored commits on repository default branches "
+        "(last successful crawl on 27 July 2026 at 06:24 UTC): 3**"
     ) in output
 
 

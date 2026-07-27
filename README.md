@@ -114,7 +114,7 @@ bash runTestLocallyDocker.sh
 name: GitHub Stats Update
 on:
   schedule:
-    - cron: '0 3 * * *'  # Runs daily at 03:00 UTC
+    - cron: '17 3 * * *'  # Runs daily at 03:17 UTC
   workflow_dispatch:      # Allows manual trigger
 
 jobs:
