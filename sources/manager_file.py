@@ -204,11 +204,11 @@ class FileManager:
                     content = TokenManager.redact_sensitive_data(content)
                 
                 # Convert integer keys to strings for JSON serialization
-                if isinstance(content, list) and len(content) == 2:
-                    yearly_data, date_data = content
+                if isinstance(content, list) and len(content) in (2, 3):
+                    yearly_data = content[0]
                     if isinstance(yearly_data, dict):
                         yearly_data = {str(k): v for k, v in yearly_data.items()}
-                    content = [yearly_data, date_data]
+                    content = [yearly_data, *content[1:]]
                 
                 # Serialize data securely
                 json_data = json.dumps(content)
@@ -233,14 +233,14 @@ class FileManager:
                     data = json.loads(decrypted_data)
                     
                     # Convert string keys back to integers for yearly_data
-                    if isinstance(data, list) and len(data) == 2:
-                        yearly_data, date_data = data
+                    if isinstance(data, list) and len(data) in (2, 3):
+                        yearly_data = data[0]
                         if isinstance(yearly_data, dict):
                             yearly_data = {
                                 int(k) if k.isdigit() else k: v 
                                 for k, v in yearly_data.items()
                             }
-                            data = [yearly_data, date_data]
+                            data = [yearly_data, *data[1:]]
                     return data
                 except InvalidToken:
                     return None

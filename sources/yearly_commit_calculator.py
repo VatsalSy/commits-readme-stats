@@ -1,5 +1,5 @@
 from asyncio import sleep
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Tuple, List, Set
 import os
 from hashlib import sha256
@@ -10,7 +10,7 @@ from .manager_file import FileManager as FM
 from .manager_debug import DebugManager as DBM
 
 COMMIT_CACHE_MAX_AGE_SECONDS = 36 * 60 * 60
-CACHE_SCHEMA_VERSION = 3
+CACHE_SCHEMA_VERSION = 4
 
 
 def ensure_cache_dir():
@@ -20,13 +20,16 @@ def ensure_cache_dir():
     return cache_dir
 
 
-async def calculate_commit_data(repositories: List[Dict], target_username: str) -> Tuple[Dict, Dict]:
+async def calculate_commit_data(
+    repositories: List[Dict],
+    target_username: str,
+) -> Tuple[Dict, Dict, datetime]:
     """
     Calculate authored commit timestamps with secure local caching.
 
     :param repositories: user repositories info dictionary.
     :param target_username: GitHub username of the authenticated user.
-    :returns: Commit quarter yearly data dictionary.
+    :returns: Yearly data, commit timestamps, and successful crawl completion time.
     """
     DBM.i("Calculating commit data...")
     cache_enabled = os.getenv("GITHUB_ACTIONS", "").lower() != "true"
@@ -49,16 +52,20 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
                 max_age_seconds=COMMIT_CACHE_MAX_AGE_SECONDS,
             )
             if cached_data is not None:
-                yearly_data, date_data = cached_data
+                yearly_data, date_data, completed_at_value = cached_data
                 
                 # Validate cache structure without using string operations
                 if (isinstance(yearly_data, dict) and
                     isinstance(date_data, dict) and
+                    isinstance(completed_at_value, str) and
                     all(isinstance(v, dict) for v in yearly_data.values()) and
                     all(isinstance(v, dict) for v in date_data.values())):
 
+                    completed_at = datetime.fromisoformat(completed_at_value)
+                    if completed_at.tzinfo is None:
+                        raise ValueError("Cached crawl completion time has no timezone")
                     DBM.i("Commit data restored from cache!")
-                    return yearly_data, date_data
+                    return yearly_data, date_data, completed_at
                 else:
                     DBM.w("Cache data validation failed - fetching fresh data")
         except Exception as e:
@@ -91,13 +98,18 @@ async def calculate_commit_data(repositories: List[Dict], target_username: str) 
         )
     
     DBM.i("Commit data calculated!")
+    completed_at = datetime.now(timezone.utc)
     
     if cache_enabled:
         # Cache the data for this specific username during local development.
-        FM.cache_binary(cache_filename, [yearly_data, date_data], assets=True)
+        FM.cache_binary(
+            cache_filename,
+            [yearly_data, date_data, completed_at.isoformat()],
+            assets=True,
+        )
         DBM.i("New commit data saved to cache!")
     
-    return yearly_data, date_data
+    return yearly_data, date_data, completed_at
 
 
 def repository_key(repo_details: Dict) -> str:

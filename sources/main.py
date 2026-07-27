@@ -41,10 +41,19 @@ async def get_stats() -> str:
     repositories = await collect_user_repositories(DM.target_username)
 
     if EM.SHOW_COMMIT or EM.SHOW_DAYS_OF_WEEK:
-        yearly_data, commit_data = await calculate_commit_data(repositories, DM.target_username)
+        yearly_data, commit_data, crawl_completed_at = await calculate_commit_data(
+            repositories,
+            DM.target_username,
+        )
         timezone = "UTC"  # Default to UTC since we don't need WakaTime for timezone
         DBM.i("Adding user commit day time info...")
-        stats += f"{await make_commit_day_time_list(timezone, repositories, commit_data)}\n\n"
+        commit_stats = await make_commit_day_time_list(
+            timezone,
+            repositories,
+            commit_data,
+            crawl_completed_at,
+        )
+        stats += f"{commit_stats}\n\n"
 
     DBM.i(f"Repository stats collection completed in {datetime.now() - start_time}")
     DBM.g("Stats for README collected!")
