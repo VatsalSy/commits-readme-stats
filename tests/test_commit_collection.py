@@ -294,10 +294,15 @@ async def test_default_branch_history_deduplicates_across_forks():
     with patch.object(EnvironmentManager, "SHOW_TOTAL_COMMITS", True), patch.object(
         EnvironmentManager, "SHOW_COMMIT", False
     ), patch.object(EnvironmentManager, "SHOW_DAYS_OF_WEEK", False):
-        output = await make_commit_day_time_list("UTC", repositories, date_data)
+        output = await make_commit_day_time_list(
+            "UTC",
+            repositories,
+            date_data,
+            datetime.fromisoformat("2026-07-27T06:24:00+00:00"),
+        )
     assert (
-        "Accessible unique authored commits on repository default branches "
-        "(last successful crawl): 3"
+        "**Unique authored commits on repository default branches "
+        "(last successful crawl on 27 July 2026 at 06:24 UTC): 3**"
     ) in output
 
 
@@ -444,6 +449,33 @@ async def test_github_actions_runner_does_not_read_or_write_commit_cache():
 
 
 @pytest.mark.asyncio
+async def test_cached_commit_data_preserves_crawl_completion_time():
+    cached_at = "2026-07-26T03:17:00+00:00"
+    cached_data = [{}, {}, cached_at]
+
+    with patch.dict("os.environ", {"GITHUB_ACTIONS": ""}), patch(
+        "sources.yearly_commit_calculator.ensure_cache_dir"
+    ), patch.object(
+        FileManager,
+        "cache_binary",
+        return_value=cached_data,
+    ), patch.object(
+        DownloadManager,
+        "get_remote_graphql",
+        new=AsyncMock(),
+    ) as graphql:
+        yearly_data, date_data, completed_at = await calculate_commit_data(
+            [],
+            "VatsalSy",
+        )
+
+    assert yearly_data == {}
+    assert date_data == {}
+    assert completed_at.isoformat() == cached_at
+    graphql.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_pagination_rejects_missing_next_cursor():
     page = {
         "data": {
@@ -536,6 +568,20 @@ def test_commit_cache_expires(tmp_path, monkeypatch):
             )
             is None
         )
+
+
+def test_commit_cache_round_trip_preserves_completion_time(tmp_path, monkeypatch):
+    monkeypatch.setattr(FileManager, "ASSETS_DIR", str(tmp_path))
+    monkeypatch.setattr(FileManager, "_ENCRYPTION_KEY", None)
+    cached_data = [
+        {2026: {"commits": 1}},
+        {"owner/repo": {}},
+        "2026-07-26T03:17:00+00:00",
+    ]
+
+    FileManager.cache_binary("commits.json", cached_data, assets=True)
+
+    assert FileManager.cache_binary("commits.json", assets=True) == cached_data
 
 
 def test_commit_query_filters_by_github_user_identity():

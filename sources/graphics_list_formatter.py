@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Optional
 from datetime import datetime
 
 from pytz import timezone, utc
@@ -76,13 +76,19 @@ def make_list(data: List = None, names: List[str] = None, texts: List[str] = Non
     return "\n".join(data_list)
 
 
-async def make_commit_day_time_list(time_zone: str, repositories: Dict, commit_dates: Dict) -> str:
+async def make_commit_day_time_list(
+    time_zone: str,
+    repositories: Dict,
+    commit_dates: Dict,
+    crawl_completed_at: Optional[datetime] = None,
+) -> str:
     """
     Calculate commit-related info, how many commits were made, and at what time of day and day of week.
 
     :param time_zone: User time zone.
     :param repositories: User repositories list.
     :param commit_dates: User commit data list.
+    :param crawl_completed_at: Completion time for the successful crawl.
     :returns: string representation of statistics.
     """
     stats = str()
@@ -109,9 +115,17 @@ async def make_commit_day_time_list(time_zone: str, repositories: Dict, commit_d
 
     # Add total commits count if enabled
     if EM.SHOW_TOTAL_COMMITS:
+        completed_at = crawl_completed_at or datetime.now(utc)
+        if completed_at.tzinfo is None:
+            completed_at = utc.localize(completed_at)
+        local_completed_at = completed_at.astimezone(timezone(time_zone))
+        crawl_timestamp = (
+            f"{local_completed_at.day} "
+            f"{local_completed_at:%B %Y at %H:%M %Z}"
+        )
         stats += (
-            "**Accessible unique authored commits on repository default branches "
-            f"(last successful crawl): {total_commits}** \n\n"
+            "**Unique authored commits on repository default branches "
+            f"(last successful crawl on {crawl_timestamp}): {total_commits}** \n\n"
         )
 
     if EM.SHOW_COMMIT:
