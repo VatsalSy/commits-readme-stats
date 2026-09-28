@@ -13,7 +13,7 @@ python-dotenv==1.2.3
 pytz==2026.3.post1
 
 # Codestyle checking modules:
-flake8==7.3.0
+flake8==7.4.1
 black==26.5.1
 
 # Add encryption support
