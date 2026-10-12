@@ -14,7 +14,7 @@ pytz==2026.4
 
 # Codestyle checking modules:
 flake8==7.4.1
-black==26.5.1
+black==26.10.0
 
 # Add encryption support
 cryptography==50.0.2
