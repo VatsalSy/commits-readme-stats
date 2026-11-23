@@ -1,3 +1,4 @@
+from base64 import b64encode
 import os
 from typing import Optional, Dict, Any
 import hashlib
@@ -10,6 +11,7 @@ class TokenManager:
     
     _token: Optional[str] = None
     _token_hash: Optional[str] = None  # Store hash instead of actual token
+    _push_token: Optional[str] = None
     
     @classmethod
     def get_token(cls) -> str:
@@ -83,10 +85,34 @@ class TokenManager:
             
         return True
     
+    @classmethod
+    def get_push_token(cls, require_separate: bool = False) -> str:
+        """
+        Credential used only to clone and push the profile repository.
+
+        Defaults to the crawl token. When private repositories are counted the
+        crawl token must stay read-only, so a separate push token is required.
+        """
+        token = os.getenv('INPUT_GH_PUSH_TOKEN', '').strip()
+        if not token:
+            if require_separate:
+                raise ValueError(
+                    "INCLUDE_PRIVATE requires GH_PUSH_TOKEN (for example the workflow's github.token) "
+                    "so that the crawl token can be read-only"
+                )
+            return cls.get_token()
+        if len(token) < 20 or any(ord(c) <= 32 or ord(c) > 126 for c in token):
+            raise ValueError("Invalid GH_PUSH_TOKEN format")
+        cls._push_token = token
+        return token
+
     @staticmethod
     def mask_token(text: str, token: Optional[str] = None) -> str:
         """Mask token in text to prevent accidental exposure"""
         if token is None:
+            push_token = TokenManager._push_token
+            if push_token and push_token in text:
+                text = text.replace(push_token, '*' * 8)
             token = TokenManager._token
             
         if token and token in text:
@@ -96,12 +122,17 @@ class TokenManager:
     
     @classmethod
     def get_credentials_helper(cls) -> Dict[str, str]:
-        """Get Git credentials helper configuration"""
-        token = cls.get_token()
+        """Pass HTTPS authorization only to the current Git subprocess."""
+        auth = b64encode(f"x-access-token:{cls.get_push_token()}".encode()).decode()
         return {
-            'GIT_ASKPASS': 'echo',
-            'GIT_USERNAME': 'oauth2',
-            'GIT_PASSWORD': token
+            'GIT_CONFIG_COUNT': '3',
+            'GIT_CONFIG_KEY_0': 'credential.helper',
+            'GIT_CONFIG_VALUE_0': '',
+            'GIT_CONFIG_KEY_1': 'http.https://github.com/.extraheader',
+            'GIT_CONFIG_VALUE_1': f'Authorization: Basic {auth}',
+            'GIT_CONFIG_KEY_2': 'http.followRedirects',
+            'GIT_CONFIG_VALUE_2': 'false',
+            'GIT_TERMINAL_PROMPT': '0',
         }
     
     @staticmethod
@@ -153,10 +184,9 @@ def get_token_user(token):
             if 'data' in data and 'viewer' in data['data'] and 'login' in data['data']['viewer']:
                 return data['data']['viewer']['login']
             else:
-                DBM.w(f"Unexpected response structure: {data}")
+                DBM.w("Unexpected token owner response structure")
         else:
             DBM.w(f"API request failed with status {response.status_code}")
-            DBM.w(f"Response content: {response.text}")
     except Exception as e:
-        DBM.w(f"Error in get_token_user: {str(e)}")
+        DBM.w("Failed to look up token owner")
     return None

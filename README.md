@@ -125,10 +125,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_COMMIT_TOKEN }}
+          persist-credentials: false
 
       - name: Generate Stats
-        uses: VatsalSy/commits-readme-stats@v3.0
+        uses: VatsalSy/commits-readme-stats@REVIEWED_COMMIT_SHA
         with:
           GH_COMMIT_TOKEN: ${{ secrets.GH_COMMIT_TOKEN }}
           SHOW_COMMIT: true
@@ -158,9 +158,16 @@ jobs:
 ```
 
 4. Set up GitHub Personal Access Token:
+   - Replace `REVIEWED_COMMIT_SHA` in the sample workflow with the reviewed release commit.
    - Go to [GitHub Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens)
-   - Generate a token with `repo` and `user` scopes
+   - Use an expiring fine-grained token limited to the public profile repository, with Contents: Read and write for publishing. The crawler includes only public repositories. Do not grant access to private repositories or broader account scopes.
    - Add the token as a repository secret named `GH_COMMIT_TOKEN`
+
+5. (Optional) Count private repositories in the aggregate:
+   - Set `INCLUDE_PRIVATE: true` and `GH_PUSH_TOKEN: ${{ github.token }}` on the action. The job already has `contents: write`, so the workflow token publishes the README.
+   - Replace `GH_COMMIT_TOKEN` with an expiring fine-grained token for your own account, all repositories, with **Contents: Read-only** and **Metadata: Read-only** and nothing else. It is used only to read commit history.
+   - Only totals and time-of-day or weekday buckets are published. Repository names and per-repository counts are never logged or written to the README.
+   - A fine-grained token covers one resource owner, so private repositories owned by other accounts or organisations are not counted. Do not use a classic `repo` token here.
 
 ## Configuration Options
 
@@ -169,6 +176,8 @@ jobs:
 | Option | Description | Required | Default |
 |--------|-------------|----------|---------|
 | `GH_COMMIT_TOKEN` | GitHub Personal Access Token | Yes | N/A |
+| `GH_PUSH_TOKEN` | Token used only to push the README. Required with `INCLUDE_PRIVATE` | No | `GH_COMMIT_TOKEN` |
+| `INCLUDE_PRIVATE` | Count private repositories in the aggregate (names never published) | No | `false` |
 | `SHOW_COMMIT` | Show commit timing patterns | No | `true` |
 | `SHOW_DAYS_OF_WEEK` | Show most productive days | No | `true` |
 | `SHOW_TOTAL_COMMITS` | Show total number of commits | No | `true` |
@@ -204,9 +213,10 @@ jobs:
 
 ### Getting a Token
 1. Go to GitHub Settings → Developer Settings → Personal Access Tokens
-2. Generate a new token with the following permissions:
-   - `repo` (for repository access)
-   - `user` (for user data access)
+2. Generate an expiring fine-grained token for your own account:
+   - Public repositories only, for the default public count
+   - Or all repositories with Contents: Read-only and Metadata: Read-only, if you set `INPUT_INCLUDE_PRIVATE=true`
+   - Do not use a classic `repo` or `user` scope token
 3. Save the token securely and use it in the script
 
 ### Running the Script

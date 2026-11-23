@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_COMMIT_TOKEN }}
+          persist-credentials: false
           
       - name: Generate Stats
         uses: ./

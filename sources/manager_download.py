@@ -10,7 +10,6 @@ from httpx import AsyncClient
 
 from .manager_environment import EnvironmentManager as EM
 from .manager_debug import DebugManager as DBM
-from .manager_token import TokenManager
 
 
 class GraphQLHTTPError(Exception):
@@ -24,6 +23,27 @@ class GraphQLHTTPError(Exception):
         )
 
 
+class GraphQLContractError(ValueError):
+    """A safe, locally constructed error for a violated API contract."""
+
+
+def public_repository_nodes(nodes):
+    """Do not carry private or unclassified repositories beyond the API boundary."""
+    return [node for node in nodes if isinstance(node, dict) and node.get("isPrivate") is False]
+
+
+def repository_privacy_filter(include_private: bool):
+    """GraphQL privacy argument: public only unless private repositories are opted in."""
+    return None if include_private else "PUBLIC"
+
+
+def countable_repository_nodes(nodes, include_private: bool):
+    """Repositories that may contribute to the aggregate. Their names are never logged."""
+    if include_private:
+        return [node for node in nodes if isinstance(node, dict)]
+    return public_repository_nodes(nodes)
+
+
 GITHUB_API_QUERIES = {
     "user_identity": """
 query($username: String!) {
@@ -35,13 +55,14 @@ query($username: String!) {
 }
 """,
     "user_repository_list": """
-query($username: String!, $after: String) {
+query($username: String!, $after: String, $privacy: RepositoryPrivacy) {
     user(login: $username) {
         repositories(
             first: 100,
             after: $after,
             orderBy: {field: CREATED_AT, direction: DESC},
-            ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR]
+            ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR],
+            privacy: $privacy
         ) {
             nodes {
                 name
@@ -263,6 +284,10 @@ class DownloadManager:
         max_retries = 5
         result = None
         base_variables = variables.copy()
+        if query == "user_repository_list":
+            privacy = repository_privacy_filter(EM.INCLUDE_PRIVATE)
+            if privacy is not None:
+                base_variables["privacy"] = privacy
         page_count = 0
         seen_cursors = set()
         
@@ -274,7 +299,7 @@ class DownloadManager:
                     else DownloadManager._MAX_HISTORY_PAGES
                 )
                 if query != "user_identity" and page_count >= max_pages:
-                    raise Exception(
+                    raise GraphQLContractError(
                         f"Page budget exceeded for GraphQL query: {query}"
                     )
 
@@ -349,30 +374,11 @@ class DownloadManager:
                         continue
 
                 if response.status_code != 200:
-                    # Mask sensitive information before logging or raising
-                    status_code = response.status_code
-                    masked_headers = {
-                        k: TokenManager.mask_token(str(v)) 
-                        for k, v in response.headers.items()
-                    }
-                    
-                    try:
-                        # Try to get JSON response for better error details
-                        error_data = response.json()
-                        masked_error = TokenManager.mask_token(str(error_data.get('message', '')))
-                    except:
-                        # Fallback to basic error if JSON parsing fails
-                        masked_error = f"HTTP {status_code}"
-                        
-                    if EM.DEBUG_RUN:
-                        masked_error += f"\nHeaders: {masked_headers}"
-                        
-                    raise GraphQLHTTPError(status_code, masked_error)
-                    
+                    raise GraphQLHTTPError(response.status_code, "GitHub rejected the request")
+
                 data = response_data
                 if "errors" in data:
-                    error_text = TokenManager.mask_token(str(data['errors']))
-                    raise Exception(f"GraphQL errors: {error_text}")
+                    raise ValueError("GitHub returned GraphQL errors")
                 
                 # Reset retry count on successful request    
                 retry_count = 0
@@ -392,7 +398,10 @@ class DownloadManager:
 
                 if result is None:
                     result = deepcopy(page_data)
-                all_nodes.extend(connection["nodes"])
+                nodes = connection["nodes"]
+                if query == "user_repository_list":
+                    nodes = countable_repository_nodes(nodes, EM.INCLUDE_PRIVATE)
+                all_nodes.extend(nodes)
                 page_count += 1
                 has_next_page = connection["pageInfo"]["hasNextPage"]
                 next_cursor = connection["pageInfo"]["endCursor"]
@@ -402,16 +411,17 @@ class DownloadManager:
                         or next_cursor == end_cursor
                         or next_cursor in seen_cursors
                     ):
-                        raise Exception(
+                        raise GraphQLContractError(
                             f"Invalid pagination cursor for GraphQL query: {query}"
                         )
                     seen_cursors.add(next_cursor)
                 end_cursor = next_cursor
                     
             except Exception as e:
-                error_msg = TokenManager.mask_token(str(e))
-                DBM.p(f"Error executing GraphQL query: {error_msg}")
-                raise
+                DBM.p(f"GraphQL request failed: {query}")
+                if isinstance(e, (GraphQLHTTPError, GraphQLContractError)):
+                    raise
+                raise ValueError(f"GraphQL request failed: {query}") from None
                 
         if retry_count >= max_retries:
             raise Exception("Max retries exceeded for GraphQL query")

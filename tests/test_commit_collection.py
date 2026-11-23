@@ -150,7 +150,7 @@ async def test_5xx_retries_preserve_status_code_from_real_response():
             )
 
     assert error.value.status_code == 502
-    assert str(error.value) == "GraphQL query failed (HTTP 502): Server Error"
+    assert str(error.value) == "GraphQL query failed (HTTP 502): GitHub rejected the request"
     assert client.post.await_count == 5
 
 
