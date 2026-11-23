@@ -213,9 +213,10 @@ jobs:
 
 ### Getting a Token
 1. Go to GitHub Settings → Developer Settings → Personal Access Tokens
-2. Generate a new token with the following permissions:
-   - `repo` (for repository access)
-   - `user` (for user data access)
+2. Generate an expiring fine-grained token for your own account:
+   - Public repositories only, for the default public count
+   - Or all repositories with Contents: Read-only and Metadata: Read-only, if you set `INPUT_INCLUDE_PRIVATE=true`
+   - Do not use a classic `repo` or `user` scope token
 3. Save the token securely and use it in the script
 
 ### Running the Script

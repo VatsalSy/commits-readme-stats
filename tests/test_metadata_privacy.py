@@ -96,3 +96,34 @@ async def test_repository_request_and_result_follow_the_opt_in(include_private, 
     assert [node["name"] for node in nodes] == names
     assert client.post.await_args.kwargs["json"]["variables"].get("privacy") == sent_privacy
     assert "closed" not in caplog.text and "open" not in caplog.text
+
+
+def test_clone_does_not_leave_credentials_on_the_repository_object(tmp_path, monkeypatch):
+    from unittest.mock import MagicMock
+    from git import Repo
+    from sources import manager_github
+    from sources.manager_github import GitHubManager
+
+    source = Repo.init(tmp_path / "source")
+    (tmp_path / "source" / "README.md").write_text("fixture")
+    source.index.add(["README.md"])
+    source.index.commit("fixture")
+    real_clone = Repo.clone_from
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("INPUT_GH_PUSH_TOKEN", "synthetic-push-fixture-0000")
+    github = MagicMock()
+    github.get_user.return_value.login = "owner"
+    with patch.object(manager_github, "Github", return_value=github), \
+            patch.object(TokenManager, "get_token", return_value="synthetic-crawl-fixture"), \
+            patch.object(Repo, "clone_from", side_effect=lambda url, **kw: real_clone(str(tmp_path / "source"), **kw)):
+        GitHubManager.prepare_github_env()
+
+    assert not any(key.startswith("GIT_CONFIG") for key in GitHubManager.REPO.git.environment())
+
+
+def test_local_cache_is_keyed_by_privacy_mode():
+    import inspect
+    from sources import yearly_commit_calculator
+
+    assert "EM.INCLUDE_PRIVATE" in inspect.getsource(yearly_commit_calculator.calculate_commit_data)

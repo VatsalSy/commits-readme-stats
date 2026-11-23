@@ -39,6 +39,7 @@ async def calculate_commit_data(
     # Create cache filename with username (using hash for safety)
     cache_filename = (
         f"commits_v{CACHE_SCHEMA_VERSION}_"
+        f"{'all' if EM.INCLUDE_PRIVATE else 'public'}_"
         f"{sha256(target_username.encode()).hexdigest()}.json"
     )
     

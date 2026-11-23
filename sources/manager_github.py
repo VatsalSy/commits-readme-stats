@@ -66,6 +66,9 @@ class GitHubManager:
                 to_path=clone_path,
                 env=credentials
             )
+            # GitPython keeps the clone environment on the repository object.
+            # Drop it so only the push carries the authorization header.
+            GitHubManager.REPO.git.update_environment(**{key: None for key in credentials})
             
             DBM.g("Repository cloned successfully")
             
