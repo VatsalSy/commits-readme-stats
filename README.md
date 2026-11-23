@@ -125,10 +125,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_COMMIT_TOKEN }}
+          persist-credentials: false
 
       - name: Generate Stats
-        uses: VatsalSy/commits-readme-stats@v3.0
+        uses: VatsalSy/commits-readme-stats@REVIEWED_COMMIT_SHA
         with:
           GH_COMMIT_TOKEN: ${{ secrets.GH_COMMIT_TOKEN }}
           SHOW_COMMIT: true
@@ -158,8 +158,9 @@ jobs:
 ```
 
 4. Set up GitHub Personal Access Token:
+   - Replace `REVIEWED_COMMIT_SHA` in the sample workflow with the reviewed release commit.
    - Go to [GitHub Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens)
-   - Generate a token with `repo` and `user` scopes
+   - Use an expiring fine-grained token limited to the public profile repository, with Contents: Read and write for publishing. The crawler includes only public repositories. Do not grant access to private repositories or broader account scopes.
    - Add the token as a repository secret named `GH_COMMIT_TOKEN`
 
 ## Configuration Options

@@ -1,3 +1,4 @@
+from base64 import b64encode
 import os
 from typing import Optional, Dict, Any
 import hashlib
@@ -96,12 +97,17 @@ class TokenManager:
     
     @classmethod
     def get_credentials_helper(cls) -> Dict[str, str]:
-        """Get Git credentials helper configuration"""
-        token = cls.get_token()
+        """Pass HTTPS authorization only to the current Git subprocess."""
+        auth = b64encode(f"x-access-token:{cls.get_token()}".encode()).decode()
         return {
-            'GIT_ASKPASS': 'echo',
-            'GIT_USERNAME': 'oauth2',
-            'GIT_PASSWORD': token
+            'GIT_CONFIG_COUNT': '3',
+            'GIT_CONFIG_KEY_0': 'credential.helper',
+            'GIT_CONFIG_VALUE_0': '',
+            'GIT_CONFIG_KEY_1': 'http.https://github.com/.extraheader',
+            'GIT_CONFIG_VALUE_1': f'Authorization: Basic {auth}',
+            'GIT_CONFIG_KEY_2': 'http.followRedirects',
+            'GIT_CONFIG_VALUE_2': 'false',
+            'GIT_TERMINAL_PROMPT': '0',
         }
     
     @staticmethod
@@ -153,10 +159,9 @@ def get_token_user(token):
             if 'data' in data and 'viewer' in data['data'] and 'login' in data['data']['viewer']:
                 return data['data']['viewer']['login']
             else:
-                DBM.w(f"Unexpected response structure: {data}")
+                DBM.w("Unexpected token owner response structure")
         else:
             DBM.w(f"API request failed with status {response.status_code}")
-            DBM.w(f"Response content: {response.text}")
     except Exception as e:
-        DBM.w(f"Error in get_token_user: {str(e)}")
+        DBM.w("Failed to look up token owner")
     return None

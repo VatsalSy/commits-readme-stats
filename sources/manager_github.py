@@ -70,9 +70,8 @@ class GitHubManager:
             DBM.g("Repository cloned successfully")
             
         except Exception as e:
-            error_msg = TokenManager.mask_token(str(e))
-            DBM.p(f"Error preparing GitHub environment: {error_msg}")
-            raise
+            DBM.p("Error preparing GitHub environment")
+            raise RuntimeError("Could not clone the profile repository") from None
 
     @staticmethod
     def _get_author() -> Actor:
@@ -198,9 +197,6 @@ class GitHubManager:
             credentials = TokenManager.get_credentials_helper()
             DBM.i(f"Setting up Git credentials for: {GitHubManager._REMOTE_NAME}")
             
-            # Configure git environment with credentials
-            GitHubManager.REPO.git.update_environment(**credentials)
-            
             # Add the README file to git
             DBM.i("Adding README.md to git index...")
             GitHubManager.REPO.index.add(['README.md'])
@@ -209,16 +205,17 @@ class GitHubManager:
             DBM.i(f"Committing as: {actor.name} <{actor.email}>")
             GitHubManager.REPO.index.commit(EM.COMMIT_MESSAGE, author=actor, committer=actor)
 
-            if EM.COMMIT_SINGLE:
-                DBM.i("Pushing files to repo as a single commit...")
-                refspec = f"{GitHubManager._SINGLE_COMMIT_BRANCH}:{GitHubManager.branch(EM.PUSH_BRANCH_NAME)}"
-                DBM.i(f"Using refspec: {refspec}")
-                headers = GitHubManager.REPO.remotes.origin.push(force=True, refspec=refspec)
-            else:
-                DBM.i("Pushing files to repo...")
-                current_branch = GitHubManager.REPO.active_branch.name
-                DBM.i(f"Pushing current branch: {current_branch}")
-                headers = GitHubManager.REPO.remotes.origin.push()
+            with GitHubManager.REPO.git.custom_environment(**credentials):
+                if EM.COMMIT_SINGLE:
+                    DBM.i("Pushing files to repo as a single commit...")
+                    refspec = f"{GitHubManager._SINGLE_COMMIT_BRANCH}:{GitHubManager.branch(EM.PUSH_BRANCH_NAME)}"
+                    DBM.i(f"Using refspec: {refspec}")
+                    headers = GitHubManager.REPO.remotes.origin.push(force=True, refspec=refspec)
+                else:
+                    DBM.i("Pushing files to repo...")
+                    current_branch = GitHubManager.REPO.active_branch.name
+                    DBM.i(f"Pushing current branch: {current_branch}")
+                    headers = GitHubManager.REPO.remotes.origin.push()
 
             if len(headers) == 0:
                 raise Exception("Push failed - no headers returned")
@@ -228,9 +225,8 @@ class GitHubManager:
 
         except Exception as e:
             # Safely log error without exposing sensitive data
-            error_msg = TokenManager.mask_token(str(e))
-            DBM.p(f"Error in commit update: {error_msg}")
-            raise
+            DBM.p("Error in commit update")
+            raise RuntimeError("Could not update the profile repository") from None
 
     @staticmethod
     def set_github_output(stats: str):
@@ -289,6 +285,5 @@ class GitHubManager:
             DBM.g("Repository cloned successfully")
             
         except Exception as e:
-            error_msg = TokenManager.mask_token(str(e))
-            DBM.p(f"Error cloning repository: {error_msg}")
-            raise
+            DBM.p("Error cloning repository")
+            raise RuntimeError("Could not clone the profile repository") from None

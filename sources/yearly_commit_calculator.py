@@ -10,7 +10,7 @@ from .manager_file import FileManager as FM
 from .manager_debug import DebugManager as DBM
 
 COMMIT_CACHE_MAX_AGE_SECONDS = 36 * 60 * 60
-CACHE_SCHEMA_VERSION = 4
+CACHE_SCHEMA_VERSION = 5
 
 
 def ensure_cache_dir():
@@ -69,7 +69,7 @@ async def calculate_commit_data(
                 else:
                     DBM.w("Cache data validation failed - fetching fresh data")
         except Exception as e:
-            DBM.w(f"Cache load failed: {str(e)} - fetching fresh data")
+            DBM.w("Cache load failed - fetching fresh data")
     else:
         DBM.i("Skipping commit cache on the GitHub-hosted runner.")
 
@@ -86,7 +86,7 @@ async def calculate_commit_data(
     
     # Process repositories one by one
     for i, repo in enumerate(repositories, 1):
-        DBM.i(f"\t{i}/{len(repositories)} Retrieving repo: {repo['owner']['login']}/{repo['name']}")
+        DBM.i(f"\t{i}/{len(repositories)} Retrieving public repository")
         await update_data_with_commit_stats(
             repo,
             yearly_data,
@@ -180,10 +180,8 @@ async def update_data_with_commit_stats(
     default_branch = repo_details.get("defaultBranchRef")
     branch_name = default_branch.get("name") if default_branch else None
     if not branch_name:
-        DBM.i(f"\t\t{repo_key}: skipped empty repository")
+        DBM.i(f"\t\tSkipped empty repository")
         return
-
-    repo_commit_count = 0
 
     try:
         commits = await get_default_branch_commits(
@@ -205,7 +203,6 @@ async def update_data_with_commit_stats(
         # Deduplicate Git objects across repositories and forks.
         for commit in user_commits:
             seen_commit_oids.add(commit["oid"])
-            repo_commit_count += 1
             
             if repo_key not in date_data:
                 date_data[repo_key] = dict()
@@ -214,11 +211,9 @@ async def update_data_with_commit_stats(
             date_data[repo_key][branch_name][commit["oid"]] = commit["committedDate"]
                 
     except Exception as e:
-        DBM.w(f"\t\tError processing default branch {branch_name}: {str(e)}")
+        DBM.w(f"\t\tError processing default branch")
         raise
     
-    # Print repository info with unique commit count
-    DBM.i(f"\t\t{repo_key}: {repo_commit_count} commits")
 
     if not EM.DEBUG_RUN:
         await sleep(0.4)
