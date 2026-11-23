@@ -86,7 +86,7 @@ async def calculate_commit_data(
     
     # Process repositories one by one
     for i, repo in enumerate(repositories, 1):
-        DBM.i(f"\t{i}/{len(repositories)} Retrieving public repository")
+        DBM.i(f"\t{i}/{len(repositories)} Retrieving repository")
         await update_data_with_commit_stats(
             repo,
             yearly_data,

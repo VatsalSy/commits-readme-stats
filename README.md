@@ -163,6 +163,12 @@ jobs:
    - Use an expiring fine-grained token limited to the public profile repository, with Contents: Read and write for publishing. The crawler includes only public repositories. Do not grant access to private repositories or broader account scopes.
    - Add the token as a repository secret named `GH_COMMIT_TOKEN`
 
+5. (Optional) Count private repositories in the aggregate:
+   - Set `INCLUDE_PRIVATE: true` and `GH_PUSH_TOKEN: ${{ github.token }}` on the action. The job already has `contents: write`, so the workflow token publishes the README.
+   - Replace `GH_COMMIT_TOKEN` with an expiring fine-grained token for your own account, all repositories, with **Contents: Read-only** and **Metadata: Read-only** and nothing else. It is used only to read commit history.
+   - Only totals and time-of-day or weekday buckets are published. Repository names and per-repository counts are never logged or written to the README.
+   - A fine-grained token covers one resource owner, so private repositories owned by other accounts or organisations are not counted. Do not use a classic `repo` token here.
+
 ## Configuration Options
 
 ### Core Options
@@ -170,6 +176,8 @@ jobs:
 | Option | Description | Required | Default |
 |--------|-------------|----------|---------|
 | `GH_COMMIT_TOKEN` | GitHub Personal Access Token | Yes | N/A |
+| `GH_PUSH_TOKEN` | Token used only to push the README. Required with `INCLUDE_PRIVATE` | No | `GH_COMMIT_TOKEN` |
+| `INCLUDE_PRIVATE` | Count private repositories in the aggregate (names never published) | No | `false` |
 | `SHOW_COMMIT` | Show commit timing patterns | No | `true` |
 | `SHOW_DAYS_OF_WEEK` | Show most productive days | No | `true` |
 | `SHOW_TOTAL_COMMITS` | Show total number of commits | No | `true` |

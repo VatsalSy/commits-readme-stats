@@ -32,6 +32,18 @@ def public_repository_nodes(nodes):
     return [node for node in nodes if isinstance(node, dict) and node.get("isPrivate") is False]
 
 
+def repository_privacy_filter(include_private: bool):
+    """GraphQL privacy argument: public only unless private repositories are opted in."""
+    return None if include_private else "PUBLIC"
+
+
+def countable_repository_nodes(nodes, include_private: bool):
+    """Repositories that may contribute to the aggregate. Their names are never logged."""
+    if include_private:
+        return [node for node in nodes if isinstance(node, dict)]
+    return public_repository_nodes(nodes)
+
+
 GITHUB_API_QUERIES = {
     "user_identity": """
 query($username: String!) {
@@ -43,14 +55,14 @@ query($username: String!) {
 }
 """,
     "user_repository_list": """
-query($username: String!, $after: String) {
+query($username: String!, $after: String, $privacy: RepositoryPrivacy) {
     user(login: $username) {
         repositories(
             first: 100,
             after: $after,
             orderBy: {field: CREATED_AT, direction: DESC},
             ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR],
-            privacy: PUBLIC
+            privacy: $privacy
         ) {
             nodes {
                 name
@@ -272,6 +284,10 @@ class DownloadManager:
         max_retries = 5
         result = None
         base_variables = variables.copy()
+        if query == "user_repository_list":
+            privacy = repository_privacy_filter(EM.INCLUDE_PRIVATE)
+            if privacy is not None:
+                base_variables["privacy"] = privacy
         page_count = 0
         seen_cursors = set()
         
@@ -384,7 +400,7 @@ class DownloadManager:
                     result = deepcopy(page_data)
                 nodes = connection["nodes"]
                 if query == "user_repository_list":
-                    nodes = public_repository_nodes(nodes)
+                    nodes = countable_repository_nodes(nodes, EM.INCLUDE_PRIVATE)
                 all_nodes.extend(nodes)
                 page_count += 1
                 has_next_page = connection["pageInfo"]["hasNextPage"]

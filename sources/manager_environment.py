@@ -17,6 +17,8 @@ class EnvironmentManager(BaseEnvironmentManager):
     SHOW_COMMIT = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_COMMIT", "True"))
     SHOW_DAYS_OF_WEEK = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_DAYS_OF_WEEK", "True"))
     SHOW_TOTAL_COMMITS = BaseEnvironmentManager.is_truthy(getenv("INPUT_SHOW_TOTAL_COMMITS", "True"))
+    # Private repositories contribute to the aggregate only on explicit opt-in.
+    INCLUDE_PRIVATE = BaseEnvironmentManager.is_truthy(getenv("INPUT_INCLUDE_PRIVATE", "False"))
 
     # WakaTime settings (new)
     WAKATIME_API_KEY = getenv("INPUT_WAKATIME_API_KEY", "")
@@ -45,3 +47,5 @@ class EnvironmentManager(BaseEnvironmentManager):
     def init(cls):
         """Initialize environment manager"""
         cls.GH_COMMIT_TOKEN = TokenManager.get_token()
+        # Fail before any crawl if the private opt-in lacks a separate push credential.
+        TokenManager.get_push_token(require_separate=cls.INCLUDE_PRIVATE)
